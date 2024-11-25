@@ -1,48 +1,74 @@
 #!/bin/bash
 
-# Check if the user has provided all required arguments
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 <input_file.csv>"
+# Validate input arguments
+if [ $# -lt 3 ]; then
+    echo "Usage: $0 <input_file.csv> <class_number> <download_directory>"
     exit 1
 fi
 
-# Store the input arguments
+# Input arguments
 input_file="$1"
+class_number="$2"
+download_dir="$3"
 
-# Extract the base directory for downloading images
-base_dir=$(dirname "$input_file")
-download_dir="${base_dir}/downloaded_images"
+# Validate input file
+if [ ! -f "$input_file" ]; then
+    echo "Error: Input file '$input_file' does not exist."
+    exit 1
+fi
 
-# Create the 'downloaded_images' directory if it doesn't exist
-mkdir -p "$download_dir"
+# Validate class_number (must be a positive integer)
+if ! [[ "$class_number" =~ ^[0-9]+$ ]]; then
+    echo "Error: Class number must be a positive integer."
+    exit 1
+fi
 
-echo "Downloading images based on $input_file into $download_dir..."
+# Ensure the download directory exists
+mkdir -p "$download_dir" || {
+    echo "Error: Could not create directory '$download_dir'. Check permissions."
+    exit 1
+}
 
-# Extract URLs from the input file
-urls=$(awk -F ',' 'NR > 1 {print $2}' "$input_file")
-
-# Initialize the failed download counter
+# Initialize counters
 failed_download_count=0
+image_count=0
 
-# Download images only if they don't exist
-for url in $urls; do
-    filename=$(basename "$url")
-    if [ ! -f "$download_dir/$filename" ]; then
-        wget -P "$download_dir" "$url" -q || ((failed_download_count++))
+# Extract URLs and subsets from the CSV (URL in column 2, subset in the last column)
+urls_and_subsets=$(awk -F ',' 'NR > 1 {print $2, $NF}' "$input_file")
+
+echo "Downloading images into directory: $download_dir..."
+
+# Download and rename files
+while IFS=" " read -r url subset; do
+    # Skip empty URLs or subsets
+    if [ -z "$url" ] || [ -z "$subset" ]; then
+        echo "Warning: Skipping entry with missing URL or subset."
+        continue
     fi
-done
 
-# Print total failed downloads
+    # Sanitize subset name (replace spaces or special characters with underscores)
+    subset=$(echo "$subset" | tr -s '[:blank:]' '_')
+
+    # Generate file name
+    image_count=$((image_count + 1))
+    ext="${url##*.}" # Extract the extension from the URL
+    new_name="class_${class_number}_${subset}_${image_count}.${ext}"
+
+    # Download the file
+    wget --tries=3 --timeout=10 -q "$url" -O "$download_dir/$new_name" || {
+        echo "Error downloading $url"
+        ((failed_download_count++))
+    }
+done <<< "$urls_and_subsets"
+
+# Print summary
 if [ "$failed_download_count" -gt 0 ]; then
     echo "Total failed downloads: $failed_download_count"
 else
     echo "All images successfully downloaded."
 fi
 
-# Fix file names for .jpg.* and .png.* extensions in one loop
-find "$download_dir" -type f \( -name "*.jpg.*" -o -name "*.png.*" \) | while read -r file; do
-    new_name=$(echo "$file" | sed -E 's/(.*)\.(jpg|png)\.(.*)/\1_\3.\2/')
-    mv "$file" "$new_name"
-done
+# Clean up temporary files
+trap 'rm -f /tmp/shuf_input' EXIT
 
-echo "Downloading complete. File names fixed."
+echo "Download complete. Files saved to $download_dir."
