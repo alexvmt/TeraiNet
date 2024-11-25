@@ -1,3 +1,6 @@
 *.zip
 *.pt
 temp/
+images/train
+images/test
+images/test2
