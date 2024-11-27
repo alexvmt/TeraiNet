@@ -37,15 +37,20 @@ for file in "$source_dir"/*; do
     # Skip if it's not a file
     [ -f "$file" ] || continue
 
-    # Extract the class number, subset, and file extension from the file name
+    # Extract the file name
     filename=$(basename "$file")
-    class_num=$(echo "$filename" | cut -d'_' -f1 | sed 's/class_//')
-    subset=$(echo "$filename" | cut -d'_' -f2)
-    ext="${filename##*.}"
 
-    # Check if the class number is within the valid range
-    if [ "$class_num" -gt "$num_classes" ]; then
-        echo "Skipping $filename: class number exceeds the specified range."
+    # Extract the class number
+    class_num=$(echo "$filename" | grep -oP '^class_\K[0-9]+')
+    if [[ -z "$class_num" ]] || [ "$class_num" -gt "$num_classes" ]; then
+        echo "Skipping $filename: Invalid or out-of-range class number."
+        continue
+    fi
+
+    # Extract the subset (train, test, test2)
+    subset=$(echo "$filename" | grep -oP '_\K(train|test|test2)(?=_)')
+    if [[ -z "$subset" ]]; then
+        echo "Unknown subset in file $filename. Skipping."
         continue
     fi
 
