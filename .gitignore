@@ -1,6 +1,8 @@
-*.zip
-*.pt
 temp/
+megadetector/
 images/train
+images/train_sampled
 images/test
+images/test_sampled
 images/test2
+model/
