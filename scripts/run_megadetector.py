@@ -11,6 +11,7 @@ from megadetector.utils import path_utils
 parser = argparse.ArgumentParser(description="Run MegaDetector on a folder of images.")
 parser.add_argument('image_folder', type=str, help="Path to the folder containing images.")
 parser.add_argument('detector_filename', type=str, help="Path to the MegaDetector model file.")
+parser.add_argument('output_dir', type=str, help="Directory of the MegaDetector output file.")
 args = parser.parse_args()
 
 # Ensure the input image folder exists
@@ -25,7 +26,8 @@ if not os.path.isfile(args.detector_filename):
 image_folder = os.path.expanduser(args.image_folder)
 
 # Set the output file name and path
-output_file = os.path.join(image_folder, 'md_out.json')
+output_dir = os.path.expanduser(args.output_dir)
+output_file = os.path.join(output_dir, 'md_out.json')
 
 # Recursively find images in the folder
 image_file_names = path_utils.find_images(image_folder, recursive=True)
