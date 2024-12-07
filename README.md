@@ -62,7 +62,7 @@ I selected a pre-trained EfficientNetV2S with 21 mio parameters because it const
 The model has been trained for 30 epochs (early stopping after 24 epochs) with 4000 images per class.
 The model has been evaluated on 300 images per class. Below is the resulting confusion matrix.
 
-![confusion_matrix](media/confusion_matrix.jpg 'confusion_matrix')
+![confusion_matrix](media/confusion_matrix.png 'confusion_matrix')
 
 Other metrics can be found in the [respective experiment run](https://wandb.ai/alexvmt/tiger_classification/runs/0an7w90t/overview) on Weights & Biases.
 
