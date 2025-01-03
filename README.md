@@ -1,9 +1,8 @@
 # Tiger classification
 
 This repository contains scripts and notebooks to build a model that can classify tigers (and other species) in camera trap images,
-using ML (e. g. [MegaDetector](https://github.com/agentmorris/MegaDetector) and [MEWC](https://github.com/zaandahl/mewc)),
-open source tools and data (e. g. [LILA BC](https://lila.science/))
-and free compute resources (i. e. Colab and Kaggle).
+using ML (e. g. [MegaDetector](https://github.com/agentmorris/MegaDetector)), open data (e. g. [LILA BC](https://lila.science/)),
+open source tools (e. g. [MEWC](https://github.com/zaandahl/mewc)) and free compute resources (i. e. Colab and Kaggle).
 
 ![tiger](media/anno_1440.jpg 'tiger')
 
@@ -37,6 +36,7 @@ and make it available through [EcoAssist](https://addaxdatascience.com/ecoassist
 3. Copy images to Drive
 
 *Note: Since Colab and Drive have limited capacities, one might have to further split up the process.*
+
 *Note: I found the image downloading to be much faster in Colab and Drive compared to Kaggle.*
 
 **Preprocess images**
@@ -44,10 +44,11 @@ and make it available through [EcoAssist](https://addaxdatascience.com/ecoassist
 [Open in Kaggle](https://www.kaggle.com/code/alexvmt/preprocess-images/notebook)
 
 1. Run MegaDetector on all images
-2. Snip images [following mewc-snip](https://github.com/zaandahl/mewc-snip)
+2. Snip images following [mewc-snip](https://github.com/zaandahl/mewc-snip)
 3. Copy snipped images to Kaggle Output
 
 *Note: Images must have been previously downloaded to Drive via Colab and then uploaded to Kaggle (zipped folder).*
+
 *Note: I found access to free GPUs much better and transparent in Kaggle compared to Colab.*
 
 ## Training
