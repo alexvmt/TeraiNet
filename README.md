@@ -18,7 +18,7 @@ to classify their camera trap images with regard to tigers
 - ML and open data/tools can help reduce the amount of manual labor
 when sifting through large amounts of camera trap images, looking for the needle in the haystack
 - goal: train a species classifier for Nepal (focussing on tigers)
-and make it available through [EcoAssist](https://addaxdatascience.com/ecoassist/)
+and make it available through [AddaxAI](https://addaxdatascience.com/addaxai/) (formerly known as EcoAssist)
 
 ## Data
 
@@ -69,12 +69,12 @@ Other metrics can be found in the [respective experiment run](https://wandb.ai/a
 
 *Note: There are only ~300 tiger images on LILA BC. I didn't use them in training but instead put all of them in `test2`
 to examine how the model would potentially generalize to tiger camera trap images from another source than the tiger training images
-(like it would be the case with the Nepal Tiger Trust using the model on their own images through EcoAssist).*
+(like it would be the case with the Nepal Tiger Trust using the model on their own images through AddaxAI).*
 
 ## Deployment
 
 1. Publish model on [HuggingFace](https://huggingface.co/alexvmt/tiger_classification/tree/main)
-2. Integrate and use model in [EcoAssist](https://addaxdatascience.com/ecoassist/)
+2. Integrate and use model in [AddaxAI](https://addaxdatascience.com/addaxai/) (formerly known as EcoAssist)
 
 Join [AI for Conservation Slack](https://beerys.github.io/#slack) and [WILDLABS](https://wildlabs.net/) if you're interested in using technology for conservation.
 
