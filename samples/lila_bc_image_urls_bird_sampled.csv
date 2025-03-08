@@ -1,0 +1,1 @@
+dataset_name,url_gcp,url_aws,url_azure,image_id,sequence_id,location_id,frame_num,original_label,scientific_name,common_name,datetime,annotation_level,kingdom,phylum,subphylum,superclass,class,subclass,infraclass,superorder,order,suborder,infraorder,superfamily,family,subfamily,tribe,genus,species,subspecies,variety,subset
