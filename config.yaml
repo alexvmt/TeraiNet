@@ -1,0 +1,24 @@
+directories:
+  project_dir: "drive/MyDrive/TeraiNet"
+  scripts_dir: "scripts"
+  samples_dir: "samples"
+  images_dir: "images"
+
+scripts:
+  get_image_urls_script: "get_image_urls_from_lila_bc.sh"
+  download_images_script: "download_images_from_lila_bc.sh"
+  prep_amur_tiger_images: "prep_amur_tiger_images.sh"
+  run_megadetector: "run_megadetector.py"
+  copy_snipped_images: "copy_snipped_images.sh"
+
+classes:
+  tiger: 1
+  leopard: 2
+  black_bear: 3
+  other_carnivores: 4
+  deer: 5
+  wild_boar: 6
+  buffalo: 7
+  rhino: 8
+  elephant: 9
+  bird: 10
