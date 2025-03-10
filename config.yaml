@@ -7,6 +7,7 @@ directories:
 scripts:
   get_image_urls_script: "get_image_urls_from_lila_bc.sh"
   download_images_script: "download_images_from_lila_bc.sh"
+  unzip_and_copy_script: "unzip_and_copy_lila_bc_images.sh"
   prep_amur_tiger_images: "prep_amur_tiger_images.sh"
   run_megadetector: "run_megadetector.py"
   copy_snipped_images: "copy_snipped_images.sh"
