@@ -1,5 +1,4 @@
 directories:
-  project_dir: "drive/MyDrive/TeraiNet"
   scripts_dir: "scripts"
   samples_dir: "samples"
   images_dir: "images"
@@ -12,7 +11,22 @@ scripts:
   run_megadetector: "run_megadetector.py"
   copy_snipped_images: "copy_snipped_images.sh"
 
+megadetector:
+  megadetector_dir: "megadetector"
+  megadetector_file: "md_v5a.0.0.pt"
+  megadetector_out_file: "md_out.json"
+
+kaggle:
+  images_input_dir: "kaggle/input/images/images"
+  images_output_dir: "kaggle/working/images"
+
+mewc:
+  snip_dir: "snips"
+  lower_conf: 0.05
+  snip_size: 600
+
 classes:
+  num_classes: 10
   tiger: 1
   leopard: 2
   black_bear: 3
