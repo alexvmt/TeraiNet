@@ -2,3 +2,4 @@ images/
 megadetector/
 model/
 temp/
+__pycache__/
