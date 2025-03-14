@@ -25,4 +25,3 @@ for zip_file in *.zip; do
     # Clean up the temporary folder
     rm -r temp
 done
-
