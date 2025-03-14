@@ -6,6 +6,7 @@ if [ $# -lt 2 ]; then
     exit 1
 fi
 
+# Input arguments
 input_file="$1"
 download_dir="$2"
 
@@ -21,51 +22,40 @@ if [ ! -d "$download_dir" ]; then
     exit 1
 fi
 
-# Extract class number from the last column of the first data row (skipping header)
-class_number=$(awk -F ',' 'NR==2 {gsub(/"/, "", $NF); print $NF}' "$input_file")
+# Extract class number from the filename (integer before .csv)
+class_number=$(basename "$input_file" | grep -oE '[0-9]+' | head -1)
 
-# Validate class_number
-if ! [[ "$class_number" =~ ^[0-9]+$ ]]; then
-    echo "Error: Invalid class number '$class_number'."
-    exit 1
-fi
+# Extract URLs and subsets from the CSV (URL in column 2, subset in the last column)
+urls=$(awk -F, 'NR > 1 {gsub(/"/, "", $2); print $2}' "$input_file")
+subsets=$(awk -F, 'NR > 1 {gsub(/"/, "", $NF); print $NF}' "$input_file")
+
+# Count total URLs
+total_lines=$(echo "$urls" | wc -l)
 
 # Initialize counters
 total_urls=0
 success_download_count=0
 failed_download_count=0
 
-# Read CSV file line by line, skipping the header
-first_line_skipped=false
-while IFS=, read -r _ url _ class; do
-    # Skip the first row (header)
-    if [ "$first_line_skipped" = false ]; then
-        first_line_skipped=true
+echo "Downloading images into $download_dir..."
+
+# Use paste to combine URLs and subsets line by line
+paste <(echo "$urls") <(echo "$subsets") | while IFS=$'\t' read -r url subset; do
+    # Skip empty URLs or subsets
+    if [ -z "$url" ] || [ -z "$subset" ]; then
+        echo "Warning: Skipping entry with missing URL or subset."
         continue
     fi
 
-    # Trim spaces safely
-    url=$(echo "$url" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-
-    # Skip empty URLs
-    if [ -z "$url" ]; then
-        echo "Warning: Skipping empty URL entry."
-        continue
-    fi
-
+    # Generate file name
     ((total_urls++))
-
-    # Extract file extension
-    file_extension="${url##*.}"
-    [[ -z "$file_extension" || "$file_extension" == "$url" ]] && file_extension="jpg"
-
-    # Construct unique filename
-    unique_name="class_${class_number}_${total_urls}.$file_extension"
+    ext="${url##*.}"  # Extract the extension from the URL
+    new_name="class_${class_number}_${subset}_${total_urls}.${ext}"
 
     # Check if URL is reachable
     if wget --spider -q "$url"; then
         # Download file
-        if wget --tries=3 --timeout=10 -q "$url" -O "$download_dir/$unique_name"; then
+        if wget --tries=3 --timeout=10 -q "$url" -O "$download_dir/$new_name"; then
             ((success_download_count++))
         else
             echo "Error downloading: $url"
@@ -75,11 +65,14 @@ while IFS=, read -r _ url _ class; do
         echo "Error: URL is unreachable - $url"
         ((failed_download_count++))
     fi
-done < "$input_file"
+	
+	# Print summary on last iteration
+    if [ "$total_urls" -eq "$total_lines" ]; then
+        echo "Total URLs: $total_urls"
+        echo "Total successful downloads: $success_download_count"
+        echo "Total failed downloads: $failed_download_count"
+    fi
+done
 
-# Print summary
-echo "Total URLs: $total_urls"
-echo "Total successful downloads: $success_download_count"
-echo "Total failed downloads: $failed_download_count"
 echo "Final file count in directory: $(ls -1 "$download_dir" | wc -l)"
-echo "Download complete. Files saved to $download_dir."
+echo "Downloading images complete."
