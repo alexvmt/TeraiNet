@@ -13,8 +13,8 @@ scripts:
   copy_snipped_images_script: "copy_snipped_images.sh"
 
 kaggle:
-  images_input_dir: "kaggle/input/terainet-images"
-  images_output_dir: "kaggle/working/terainet-images"
+  images_input_dir: "kaggle/input/terainet-images/terainet_images"
+  images_output_dir: "kaggle/working/terainet_images"
 
 megadetector:
   megadetector_dir: "megadetector"
