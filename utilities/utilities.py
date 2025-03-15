@@ -1,5 +1,6 @@
 import os
 import yaml
+import json
 import subprocess
 import numpy as np
 import pandas as pd
@@ -115,3 +116,16 @@ def add_subset_column(df: pd.DataFrame, train_ratio: float, seed: int = 42) -> p
     df['subset'] = np.where(random_values < train_ratio, 'train', 'test')
 
     return df
+
+
+# from mewc-detect
+def contains_animal(json_image):
+    if 'detections' in json_image.keys():
+        n = len(json_image['detections'])
+        animal_there = False
+        for i in range(0,n):
+            if json_image['detections'][i]['category'] == "1":
+                animal_there = True
+        return(animal_there)
+    else:
+        return(False)
