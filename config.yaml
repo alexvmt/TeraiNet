@@ -1,31 +1,3 @@
-directories:
-  project_dir: "terainet"
-  scripts_dir: "scripts"
-  samples_dir: "samples"
-  images_dir: "images"
-
-scripts:
-  get_image_urls_script: "get_image_urls_from_lila_bc.sh"
-  download_images_script: "download_images_from_lila_bc.sh"
-  unzip_and_copy_images_script: "unzip_and_copy_images_from_lila_bc.sh"
-  prep_amur_tiger_images_script: "prep_amur_tiger_images.sh"
-  run_megadetector_script: "run_megadetector.py"
-  copy_snipped_images_script: "copy_snipped_images.sh"
-
-kaggle:
-  images_input_dir: "kaggle/input/terainet-images/terainet_images"
-  images_output_dir: "kaggle/working/terainet_images"
-
-megadetector:
-  megadetector_dir: "megadetector"
-  megadetector_file: "md_v5a.0.0.pt"
-  megadetector_out_file: "md_out.json"
-
-mewc:
-  snip_dir: "snips"
-  lower_conf: 0.05
-  snip_size: 600
-
 classes:
   num_classes: 10
   tiger: 1
@@ -37,7 +9,41 @@ classes:
   buffalo: 7
   rhino: 8
   elephant: 9
-  bird: 10
+  bird: 10  
 
-train_params:
+scripts:
+  get_image_urls_script: "get_image_urls_from_lila_bc.sh"
+  download_images_script: "download_images_from_lila_bc.sh"
+  unzip_and_copy_images_script: "unzip_and_copy_images_from_lila_bc.sh"
+  prep_amur_tiger_images_script: "prep_amur_tiger_images.sh"
+  run_megadetector_script: "run_megadetector.py"
+  copy_snipped_images_script: "copy_snipped_images.sh"
+
+sampling_downloading:
+  scripts_dir: "scripts"
+  samples_dir: "samples"
+  images_dir: "images"
+
+preprocessing:
+  images_input_dir: "kaggle/input/terainet-images/terainet_images"
+  images_output_dir: "kaggle/working/terainet_images"
+  megadetector_dir: "megadetector"
+  megadetector_file: "md_v5a.0.0.pt"
+  megadetector_out_file: "md_out.json"
+  snip_dir: "snips"
+  lower_conf: 0.05
+  snip_size: 600
+
+training:
   train_ratio: 0.8
+  class_list_yaml_path: "kaggle/working/class_list.yaml"
+  images_input_dir: "kaggle/input/preprocess-images/terainet_images"
+  images_sampled_dir: "images_sampled"
+  train_dir: "train"
+  train_dir_sampled: "train_sampled"
+  test_dir: "test"
+  test_dir_sampled: "test_sampled"
+  test2_dir: "test2"
+  model_path: "kaggle/working/model.h5"
+  confusion_matrix_path: "kaggle/working/confusion_matrix.png"
+  wb_project: "terainet"

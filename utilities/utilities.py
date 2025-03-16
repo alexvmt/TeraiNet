@@ -129,3 +129,68 @@ def contains_animal(json_image):
         return(animal_there)
     else:
         return(False)
+
+
+def create_class_list_yaml_file(num_classes, class_names, file_path):
+    """
+    Create a YAML file that maps numerical indices to class names.
+
+    This function generates a YAML file with a mapping of integer indices 
+    (as strings starting from '1') to the provided class names. The file is 
+    saved to the specified file path, creating any necessary directories along the way.
+
+    Args:
+        num_classes (int): The number of classes. Must match the length of `class_names`.
+        class_names (list of str): A list of class names to include in the YAML file.
+        file_path (str): The full file path (including directories and file name) 
+                         where the YAML file will be saved.
+    """
+    if len(class_names) != num_classes:
+        raise ValueError('The number of class names must match num_classes.')
+
+    # ensure the directory exists
+    directory = os.path.dirname(file_path)
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+
+    # create a dictionary with the index as keys and class names as values
+    class_dict = {str(i + 1): class_names[i] for i in range(num_classes)}
+
+    # write the dictionary to a YAML file
+    with open(file_path, 'w') as file:
+        yaml.dump(class_dict, file, default_flow_style=False)
+
+
+def sample_images(source_dir, target_dir, samples_per_class, seed=42):
+    """
+    Samples a fixed number of images per class from a directory structure.
+
+    Args:
+        source_dir (str): Path to the source dataset directory.
+        target_dir (str): Path to the target dataset directory to store sampled data.
+        samples_per_class (int): Number of images to sample per class.
+        seed (int): Random seed for reproducibility.
+    """
+    random.seed(seed)
+
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+
+    for class_name in os.listdir(source_dir):
+        class_path = os.path.join(source_dir, class_name)
+        if os.path.isdir(class_path):
+            sampled_class_dir = os.path.join(target_dir, class_name)
+            os.makedirs(sampled_class_dir, exist_ok=True)
+
+            # list and shuffle all files in class directory
+            all_images = os.listdir(class_path)
+            random.shuffle(all_images)
+
+            # select desired number of samples
+            sampled_images = all_images[:samples_per_class]
+
+            # copy sampled images to new directory
+            for image_name in sampled_images:
+                source_image_path = os.path.join(class_path, image_name)
+                target_image_path = os.path.join(sampled_class_dir, image_name)
+                shutil.copy(source_image_path, target_image_path)
