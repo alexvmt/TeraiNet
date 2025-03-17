@@ -163,14 +163,16 @@ def create_class_list_yaml_file(num_classes, class_names, file_path):
         yaml.dump(class_dict, file, default_flow_style=False)
 
 
-def sample_images(source_dir, target_dir, samples_per_class, seed=42):
+def sample_images(source_dir, target_dir, samples_per_class, exclude_dir=None, seed=42):
     """
-    Samples a fixed number of images per class from a directory structure.
+    Samples a fixed number of images per class from a directory structure, ensuring that
+    validation samples do not overlap with the test dataset.
 
     Args:
-        source_dir (str): Path to the source dataset directory.
+        source_dir (str): Path to the source dataset directory (e.g., test images).
         target_dir (str): Path to the target dataset directory to store sampled data.
         samples_per_class (int): Number of images to sample per class.
+        exclude_dir (str, optional): Path to directory which images have to be excluded during sampling.
         seed (int): Random seed for reproducibility.
     """
     random.seed(seed)
@@ -184,15 +186,24 @@ def sample_images(source_dir, target_dir, samples_per_class, seed=42):
             sampled_class_dir = os.path.join(target_dir, class_name)
             os.makedirs(sampled_class_dir, exist_ok=True)
 
-            # list and shuffle all files in class directory
-            all_images = os.listdir(class_path)
-            random.shuffle(all_images)
+            # List all files in class directory
+            all_images = set(os.listdir(class_path))
 
-            # select desired number of samples
+            # Exclude certain images
+            if exclude_dir:
+                test_class_path = os.path.join(exclude_dir, class_name)
+                if os.path.exists(test_class_path):
+                    test_images = set(os.listdir(test_class_path))
+                    all_images -= test_images
+
+            # Shuffle and select desired number of samples
+            all_images = list(all_images)
+            random.shuffle(all_images)
             sampled_images = all_images[:samples_per_class]
 
-            # copy sampled images to new directory
+            # Copy sampled images to new directory
             for image_name in sampled_images:
                 source_image_path = os.path.join(class_path, image_name)
                 target_image_path = os.path.join(sampled_class_dir, image_name)
                 shutil.copy(source_image_path, target_image_path)
+
