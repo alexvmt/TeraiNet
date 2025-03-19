@@ -46,5 +46,6 @@ training:
   test_sampled_dir: "test_sampled"
   test2_dir: "test2"
   model_path: "kaggle/working/model.h5"
+  classification_report_path: "kaggle/working/classification_report.csv"
   confusion_matrix_path: "kaggle/working/confusion_matrix.png"
   wb_project: "terainet"
