@@ -135,32 +135,27 @@ def contains_animal(json_image):
 
 def create_class_list_yaml_file(num_classes, class_names, file_path):
     """
-    Create a YAML file that maps numerical indices to class names.
-
-    This function generates a YAML file with a mapping of integer indices 
-    (as strings starting from '1') to the provided class names. The file is 
-    saved to the specified file path, creating any necessary directories along the way.
+    Create a YAML file that maps numerical indices to class names, ensuring numerical sorting.
 
     Args:
         num_classes (int): The number of classes. Must match the length of `class_names`.
         class_names (list of str): A list of class names to include in the YAML file.
-        file_path (str): The full file path (including directories and file name) 
-                         where the YAML file will be saved.
+        file_path (str): The full file path where the YAML file will be saved.
     """
     if len(class_names) != num_classes:
         raise ValueError('The number of class names must match num_classes.')
 
-    # ensure the directory exists
+    # Ensure the directory exists
     directory = os.path.dirname(file_path)
     if directory and not os.path.exists(directory):
         os.makedirs(directory)
 
-    # create a dictionary with the index as keys and class names as values
-    class_dict = {str(i + 1): class_names[i] for i in range(num_classes)}
+    # Create a dictionary with indices as keys and class names as values, ensuring numerical order
+    class_dict = {str(i): class_names[i - 1] for i in range(1, num_classes + 1)}
 
-    # write the dictionary to a YAML file
+    # Write to YAML file
     with open(file_path, 'w') as file:
-        yaml.dump(class_dict, file, default_flow_style=False)
+        yaml.dump(class_dict, file, default_flow_style=False, sort_keys=True)
 
 
 def sample_images(source_dir, target_dir, samples_per_class, exclude_dir=None, seed=42):
@@ -206,4 +201,3 @@ def sample_images(source_dir, target_dir, samples_per_class, exclude_dir=None, s
                 source_image_path = os.path.join(class_path, image_name)
                 target_image_path = os.path.join(sampled_class_dir, image_name)
                 shutil.copy(source_image_path, target_image_path)
-
