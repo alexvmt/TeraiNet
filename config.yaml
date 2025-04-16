@@ -31,7 +31,7 @@ preprocessing:
   megadetector_file: "md_v5a.0.0.pt"
   megadetector_out_file: "md_out.json"
   snip_dir: "snips"
-  lower_conf: 0.05
+  lower_conf: 0.6
   snip_size: 600
 
 training:
