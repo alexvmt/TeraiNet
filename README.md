@@ -58,7 +58,7 @@ Classes:
 
 **4. Preprocess images**
 
-[Open in Kaggle](https://www.kaggle.com/code/alexvmt/preprocess-images-for-terainet)
+[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/code/alexvmt/preprocess-images-for-terainet)
 
 1. Run MegaDetector on all images
 2. Snip images following [mewc-snip](https://github.com/zaandahl/mewc-snip)
@@ -70,7 +70,7 @@ Classes:
 
 ## Model training and evaluation
 
-[Open in Kaggle](https://www.kaggle.com/code/alexvmt/train-and-evaluate-terainet/notebook?scriptVersionId=232861979)
+[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/code/alexvmt/train-and-evaluate-terainet/notebook?scriptVersionId=232861979)
 
 1. Use [Keras Image Models](https://github.com/james77777778/keras-image-models)
 2. Follow [mewc-flow](https://github.com/zaandahl/mewc-flow/blob/main/requirements.txt) and [mewc-train](https://github.com/zaandahl/mewc-train)
