@@ -20,12 +20,12 @@ and make it openly available through [AddaxAI](https://addaxdatascience.com/adda
 
 ## Data preparation
 
-**1. Select data sources**
+### 1. Select data sources
 
 - [LILA BC](https://lila.science/)
 - amur tiger re-identification [challenge](https://cvwc2019.github.io/challenge.html) at CVWC 2019
 
-**2. Sample images**
+### 2. Sample images
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alexvmt/TeraiNet/blob/main/notebooks/sample_images_from_lila_bc.ipynb)
 
@@ -33,21 +33,22 @@ and make it openly available through [AddaxAI](https://addaxdatascience.com/adda
 - Sample desired amount of images per class
 - Create train test split if applicable
 
-Classes:
-1: tiger
-2: leopard
-3: asian black bear, american black bear (not enough images of asian black bear alone)
-4: other carnivores, including dhole, black-backed jackal, gray fox, leopard cat, mainland leopard cat, marbled cat, asian golden cat (including substitutes, i. e. black-backed jackal and gray fox)
-5: deer
-6: wild boar
-7: african buffalo, cape buffalo (substitute for gaur)
-8: white rhinoceros (substitute for indian rhino)
-9: asian elephant, african elephant, african bush elephant (not enough images of asian elephant alone)
-10: bird
+**Classes**
+
+1. Tiger
+2. Leopard
+3. Asian black bear, American black bear *(not enough images of Asian black bear alone)*
+4. Other carnivores, including dhole, black-backed jackal, gray fox, leopard cat, mainland leopard cat, marbled cat, Asian golden cat *(including substitutes, i.e., black-backed jackal and gray fox)*
+5. Deer
+6. Wild boar
+7. African buffalo, Cape buffalo *(substitute for gaur)*
+8. White rhinoceros *(substitute for Indian rhino)*
+9. Asian elephant, African elephant, African bush elephant *(not enough images of Asian elephant alone)*
+10. Bird
 
 *Note: Due to a lack of images for certain species some fairly heavy compromises had to be taken. It remains to be seen how well a model trained with such compromises generalizes to the target region.*
 
-**3. Download images**
+### 3. Download images
 
 - LILA BC [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alexvmt/TeraiNet/blob/main/notebooks/download_images_from_lila_bc.ipynb)
 - amur tiger re-identification challenge [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alexvmt/TeraiNet/blob/main/notebooks/download_images_from_amur_tiger_re_identification_challenge.ipynb)
@@ -56,7 +57,7 @@ Classes:
 
 *Note: I found the image downloading to be much faster in Colab and Drive compared to Kaggle.*
 
-**4. Preprocess images**
+### 4. Preprocess images
 
 [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/code/alexvmt/preprocess-images-for-terainet)
 
@@ -80,14 +81,14 @@ I selected a pre-trained EfficientNetV2M with 54M parameters because it constitu
 The model has been trained for 50 epochs (early stopping after 31 epochs) with 2000 images per class (250 images per class in the validation set).
 The model has been evaluated on a test set with 250 images per class.
 
-**Test set performance overview**
+### Test set performance overview
 
 - Accuracy: 0.899
 - Precision: 0.900
 - Recall: 0.899
 - F1: 0.899
 
-**Test set performance per class**
+### Test set performance per class
 
 |                |precision         |recall            |f1-score          |support|
 |----------------|------------------|------------------|------------------|-------|
@@ -111,7 +112,7 @@ Most other classes have metrics of ~0.9+. But performance on some classes, inclu
 I believe that the quality of the rhino and elephant images is not ideal, e. g. there seem to be mix-ups or even other species included (e. g. zebra).
 Birds tend to be difficult to classify correctly in general.
 
-**Test set confusion matrix**
+### Test set confusion matrix
 
 ![confusion_matrix](media/confusion_matrix.png 'confusion_matrix')
 
