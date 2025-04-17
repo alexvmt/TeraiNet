@@ -1,15 +1,14 @@
 #!/bin/bash
 
 # Validate input arguments
-if [ $# -lt 3 ]; then
-    echo "Usage: $0 <input_file.csv> <class_number> <download_directory>"
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <input_file.csv> <download_directory>"
     exit 1
 fi
 
 # Input arguments
 input_file="$1"
-class_number="$2"
-download_dir="$3"
+download_dir="$2"
 
 # Validate input file
 if [ ! -f "$input_file" ]; then
@@ -17,58 +16,63 @@ if [ ! -f "$input_file" ]; then
     exit 1
 fi
 
-# Validate class_number (must be a positive integer)
-if ! [[ "$class_number" =~ ^[0-9]+$ ]]; then
-    echo "Error: Class number must be a positive integer."
+# Validate download directory
+if [ ! -d "$download_dir" ]; then
+    echo "Error: Download directory '$download_dir' does not exist."
     exit 1
 fi
 
-# Ensure the download directory exists
-mkdir -p "$download_dir" || {
-    echo "Error: Could not create directory '$download_dir'. Check permissions."
-    exit 1
-}
-
-# Initialize counters
-failed_download_count=0
-image_count=0
+# Extract class number from the filename (integer before .csv)
+class_number=$(basename "$input_file" | grep -oE '[0-9]+' | head -1)
 
 # Extract URLs and subsets from the CSV (URL in column 2, subset in the last column)
-urls_and_subsets=$(awk -F ',' 'NR > 1 {print $2, $NF}' "$input_file")
+urls=$(awk -F, 'NR > 1 {gsub(/"/, "", $2); print $2}' "$input_file")
+subsets=$(awk -F, 'NR > 1 {gsub(/"/, "", $NF); print $NF}' "$input_file")
 
-echo "Downloading images into directory: $download_dir..."
+# Count total URLs
+total_lines=$(echo "$urls" | wc -l)
 
-# Download and rename files
-while IFS=" " read -r url subset; do
+# Initialize counters
+total_urls=0
+success_download_count=0
+failed_download_count=0
+
+echo "Downloading images into $download_dir..."
+
+# Use paste to combine URLs and subsets line by line
+paste <(echo "$urls") <(echo "$subsets") | while IFS=$'\t' read -r url subset; do
     # Skip empty URLs or subsets
     if [ -z "$url" ] || [ -z "$subset" ]; then
         echo "Warning: Skipping entry with missing URL or subset."
         continue
     fi
 
-    # Sanitize subset name (replace spaces or special characters with underscores)
-    subset=$(echo "$subset" | tr -s '[:blank:]' '_')
-
     # Generate file name
-    image_count=$((image_count + 1))
-    ext="${url##*.}" # Extract the extension from the URL
-    new_name="class_${class_number}_${subset}_${image_count}.${ext}"
+    ((total_urls++))
+    ext="${url##*.}"  # Extract the extension from the URL
+    new_name="class_${class_number}_${subset}_${total_urls}.${ext}"
 
-    # Download the file
-    wget --tries=3 --timeout=10 -q "$url" -O "$download_dir/$new_name" || {
-        echo "Error downloading $url"
+    # Check if URL is reachable
+    if wget --spider -q "$url"; then
+        # Download file
+        if wget --tries=3 --timeout=10 -q "$url" -O "$download_dir/$new_name"; then
+            ((success_download_count++))
+        else
+            echo "Error downloading: $url"
+            ((failed_download_count++))
+        fi
+    else
+        echo "Error: URL is unreachable - $url"
         ((failed_download_count++))
-    }
-done <<< "$urls_and_subsets"
+    fi
+	
+	# Print summary on last iteration
+    if [ "$total_urls" -eq "$total_lines" ]; then
+        echo "Total URLs: $total_urls"
+        echo "Total successful downloads: $success_download_count"
+        echo "Total failed downloads: $failed_download_count"
+    fi
+done
 
-# Print summary
-if [ "$failed_download_count" -gt 0 ]; then
-    echo "Total failed downloads: $failed_download_count"
-else
-    echo "All images successfully downloaded."
-fi
-
-# Clean up temporary files
-trap 'rm -f /tmp/shuf_input' EXIT
-
-echo "Download complete. Files saved to $download_dir."
+echo "Final file count in directory: $(ls -1 "$download_dir" | wc -l)"
+echo "Downloading images complete."
