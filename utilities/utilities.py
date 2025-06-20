@@ -55,16 +55,23 @@ def sample_n_images_per_species(
     return pl.concat(sampled_dfs) if sampled_dfs else pl.DataFrame()
 
 
-def add_subset_column(df: pl.DataFrame, train_ratio: float, seed: int = 42) -> pl.DataFrame:
+def add_subset_column(
+    df: pl.DataFrame,
+    train_ratio: float,
+    seed: int = 42,
+    tolerance: float = 0.02
+) -> pl.DataFrame:
     """
     Adds a 'subset' column to the Polars DataFrame, splitting data into 'train', 'val', and 'test' subsets
-    based on unique 'location_id'. Ensures that no 'location_id' appears in more than one subset to prevent
-    spatial leakage, which is critical for generalization in camera trap datasets.
+    based on unique 'location_id'. Ensures no 'location_id' appears in more than one subset to prevent
+    spatial leakage, and uses a soft balancing approach with tolerance on target ratios.
 
     Parameters:
         df (pl.DataFrame): The input Polars DataFrame.
-        train_ratio (float): The ratio of the 'train' subset (e.g., 0.8 for 80% train).
+        train_ratio (float): Target ratio for the 'train' subset (e.g., 0.8 for 80% train).
+                             The remaining portion is split equally into 'val' and 'test'.
         seed (int, optional): Seed for reproducibility. Default is 42.
+        tolerance (float, optional): Acceptable deviation from target ratios (e.g., 0.02 for ±2%).
 
     Returns:
         pl.DataFrame: The DataFrame with an added 'subset' column.
@@ -72,35 +79,63 @@ def add_subset_column(df: pl.DataFrame, train_ratio: float, seed: int = 42) -> p
     if not 0 <= train_ratio <= 1:
         raise ValueError('train_ratio must be between 0 and 1.')
 
-    # Get unique location_ids and shuffle them
+    # Calculate target ratios and bounds
+    val_test_ratio = (1 - train_ratio) / 2
+    target_ratios = {'train': train_ratio, 'val': val_test_ratio, 'test': val_test_ratio}
+    lower_bounds = {k: v - tolerance for k, v in target_ratios.items()}
+    upper_bounds = {k: v + tolerance for k, v in target_ratios.items()}
+
+    # Get total number of images
+    total_images = df.shape[0]
+
+    # Shuffle location IDs
     unique_locs = df.select('location_id').unique()
     loc_list = unique_locs['location_id'].to_list()
     rng = np.random.default_rng(seed)
     rng.shuffle(loc_list)
 
-    # Determine how many locations go into each subset
-    n_locs = len(loc_list)
-    n_train = int(n_locs * train_ratio)
-    n_remaining = n_locs - n_train
-    n_val = n_remaining // 2
-    n_test = n_remaining - n_val  # handles odd remainder
+    # Compute number of images per location
+    image_counts = df.group_by('location_id').len().rename({'len': 'n_images'})
+    loc_to_n = dict(zip(image_counts['location_id'].to_list(), image_counts['n_images'].to_list()))
 
-    # Assign subsets based on shuffled location list
-    train_locs = set(loc_list[:n_train])
-    val_locs = set(loc_list[n_train:n_train + n_val])
-    test_locs = set(loc_list[n_train + n_val:])
+    # Assign locations to subsets with soft balancing
+    subsets = {'train': set(), 'val': set(), 'test': set()}
+    counts = {'train': 0, 'val': 0, 'test': 0}
 
-    # Assign subset label to each row based on its location
+    for loc in loc_list:
+        loc_n = loc_to_n[loc]
+        # Compute current image ratios
+        current_ratios = {k: counts[k] / total_images for k in counts}
+        # Determine candidate subsets within acceptable range
+        candidates = [k for k in current_ratios if current_ratios[k] < upper_bounds[k]]
+        if not candidates:
+            # fallback: choose subset with lowest current ratio
+            candidates = sorted(current_ratios.items(), key=lambda x: x[1])
+            chosen_subset = candidates[0][0]
+        else:
+            # choose randomly among candidates with minimum current ratio
+            min_ratio = min(current_ratios[c] for c in candidates)
+            min_candidates = [c for c in candidates if current_ratios[c] == min_ratio]
+            chosen_subset = rng.choice(min_candidates)
+
+        subsets[chosen_subset].add(loc)
+        counts[chosen_subset] += loc_n
+
+    # Assign subset column
     df = df.with_columns(
-        pl.when(pl.col('location_id').is_in(train_locs)).then(pl.lit('train'))
-        .when(pl.col('location_id').is_in(val_locs)).then(pl.lit('val'))
-        .when(pl.col('location_id').is_in(test_locs)).then(pl.lit('test'))
+        pl.when(pl.col('location_id').is_in(subsets['train'])).then(pl.lit('train'))
+        .when(pl.col('location_id').is_in(subsets['val'])).then(pl.lit('val'))
+        .when(pl.col('location_id').is_in(subsets['test'])).then(pl.lit('test'))
         .otherwise(pl.lit('unknown'))
         .alias('subset')
     )
-    
-    if df.filter(pl.col('subset') == 'unknown').shape[0] > 0:
-        print('Warning: Unassigned locations detected.')
+
+    if df.filter(pl.col('subset') == 'unknown').height > 0:
+        print('⚠️ Warning: Some locations could not be assigned to a subset.')
+
+    # Summary
+    final_counts = df.group_by('subset').len().rename({'len': 'count'}).sort('subset')
+    print(f'ℹ️ Subset distribution:\n{final_counts}')
 
     return df
 

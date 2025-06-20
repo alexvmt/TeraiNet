@@ -12,7 +12,6 @@ classes:
   bird: 10  
 
 scripts:
-  get_image_urls_script: "get_image_urls_from_lila_bc.sh"
   download_images_script: "download_images_from_lila_bc.sh"
   unzip_and_copy_images_script: "unzip_and_copy_images_from_lila_bc.sh"
   prep_amur_tiger_images_script: "prep_amur_tiger_images.sh"
