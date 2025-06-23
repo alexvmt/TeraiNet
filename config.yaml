@@ -40,6 +40,7 @@ training:
   images_sampled_dir: "images_sampled"
   train_dir: "train"
   train_sampled_dir: "train_sampled"
+  val_dir: "val"
   val_sampled_dir: "val_sampled"
   test_dir: "test"
   test_sampled_dir: "test_sampled"
