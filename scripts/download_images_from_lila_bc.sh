@@ -25,8 +25,8 @@ fi
 # Extract class number from the filename (integer before .csv)
 class_number=$(basename "$input_file" | grep -oE '[0-9]+' | head -1)
 
-# Extract URLs and subsets from the CSV (URL in column 2, subset in the last column)
-urls=$(awk -F, 'NR > 1 {gsub(/"/, "", $2); print $2}' "$input_file")
+# Extract URLs and subsets from the CSV (URL in column 1, subset in the last column)
+urls=$(awk -F, 'NR > 1 {gsub(/"/, "", $1); print $1}' "$input_file")
 subsets=$(awk -F, 'NR > 1 {gsub(/"/, "", $NF); print $NF}' "$input_file")
 
 # Count total URLs

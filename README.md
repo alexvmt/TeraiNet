@@ -43,7 +43,7 @@ and make it openly available through [AddaxAI](https://addaxdatascience.com/adda
 6. Wild boar
 7. African buffalo, Cape buffalo *(substitute for gaur)*
 8. White rhinoceros *(substitute for Indian rhino)*
-9. Asian elephant, African elephant, African bush elephant *(not enough images of Asian elephant alone)*
+9. Asian elephant, African bush elephant *(not enough images of Asian elephant alone)*
 10. Bird
 
 *Note: Due to a lack of images for certain species some fairly heavy compromises had to be taken. It remains to be seen how well a model trained with such compromises generalizes to the target region.*
