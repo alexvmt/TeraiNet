@@ -23,9 +23,10 @@ if ! [[ "$num_classes" =~ ^[0-9]+$ ]] || [ "$num_classes" -lt 1 ]; then
     exit 1
 fi
 
-# Create the target directories for each class (train, test for each class, and class_1 for test2)
+# Create the target directories for each class (train, val, test for each class, and class_1 for test2)
 for class_num in $(seq 1 "$num_classes"); do
     mkdir -p "$base_target_dir/train/class_$class_num"
+	mkdir -p "$base_target_dir/val/class_$class_num"
     mkdir -p "$base_target_dir/test/class_$class_num"
 done
 
@@ -47,8 +48,8 @@ for file in "$source_dir"/*; do
         continue
     fi
 
-    # Extract the subset (train, test, test2)
-    subset=$(echo "$filename" | grep -oP '_\K(train|test|test2)(?=_)')
+    # Extract the subset (train, val, test, test2)
+    subset=$(echo "$filename" | grep -oP '_\K(train|val|test|test2)(?=_)')
     if [[ -z "$subset" ]]; then
         echo "Unknown subset in file $filename. Skipping."
         continue
@@ -56,7 +57,7 @@ for file in "$source_dir"/*; do
 
     # Determine the target directory based on the subset
     case "$subset" in
-        "train" | "test")
+        "train" | "val" | "test")
             target_dir="$base_target_dir/$subset/class_$class_num"
             ;;
         "test2")

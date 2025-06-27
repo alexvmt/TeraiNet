@@ -6,6 +6,7 @@ import random
 import subprocess
 import numpy as np
 import pandas as pd
+import polars as pl
 
 
 def load_config(config_path):
@@ -14,110 +15,158 @@ def load_config(config_path):
     return config
 
 
-def run_get_image_urls_script(get_image_urls_script, urls_and_labels, column_to_filter, values_to_filter, samples_file):
-
-    command = [
-        'bash',
-        get_image_urls_script,
-        urls_and_labels,
-        column_to_filter,
-        values_to_filter,
-        samples_file
-    ]
-
-    result = subprocess.run(command, capture_output=True, text=True)
-
-    return result.stdout, result.stderr
-
-
-def get_image_urls(
-    samples_dir: str,
-    species: str,
-    get_image_urls_script: str,
-    urls_and_labels: str,
+def sample_n_images_per_species(
+    df: pl.DataFrame,
+    species_samples_dict: dict,
     column_to_filter: str,
-    values_to_filter: str
-  ):
-  """
-    Retrieves image URLs for a specified species, filters them based on given criteria,
-    and assigns a train/test subset label.
-
-    Parameters:
-    - samples_dir (str): The directory where the samples file will be saved.
-    - species (str): The target species for filtering image URLs.
-    - get_image_urls_script (str): Path to the script used for retrieving image URLs.
-    - urls_and_labels (str): Path to the CSV file containing image URLs and labels.
-    - column_to_filter (str): The column in the CSV file used for filtering (e.g., 'scientific_name').
-    - values_to_filter (str): Comma-separated values to filter within the specified column.
-
-    Returns:
-    The function writes the filtered image URLs to a CSV file and returns the file path.
-  """
-
-  # get image urls
-  samples_file = samples_dir + '/lila_bc_image_urls_' + species + '.csv'
-  stdout, stderr = run_get_image_urls_script(get_image_urls_script, urls_and_labels, column_to_filter, values_to_filter, samples_file)
-  print(stdout)
-  print(stderr)
-
-  return samples_file
-
-
-def sample_n_images_per_species(image_urls: str, species_samples_dict: dict, column_to_filter: str, seed: int = 42) -> pd.DataFrame:
+    seed: int = 42
+) -> pl.DataFrame:
     """
-    Filters and randomly samples a specified number of rows for each species from a CSV file.
+    Filters and randomly samples a specified number of rows for each species
+    from a Polars DataFrame.
 
     Parameters:
-    - image_urls (str): Path to the image URLs CSV file.
+    - df (pl.DataFrame): A Polars DataFrame containing image data and species labels.
     - species_samples_dict (dict): A dictionary where keys are species names,
       and values are the number of samples to draw for each species.
     - column_to_filter (str): The column name used for filtering species.
     - seed (int, optional): Seed for reproducibility. Default is 42.
 
     Returns:
-    - pd.DataFrame: A DataFrame containing the sampled rows for each species.
+    - pl.DataFrame: A Polars DataFrame containing the sampled rows for each species.
     """
-    # Load the CSV file
-    df = pd.read_csv(image_urls, low_memory=False)
-
-    # Initialize an empty list to store sampled DataFrames
+    # Initialize a list to collect sampled DataFrames
     sampled_dfs = []
 
-    # Sample rows per species
+    # Sample rows for each species
     for species, sample_size in species_samples_dict.items():
-        species_df = df[df[column_to_filter] == species]
-        sampled_df = species_df.sample(n=min(sample_size, len(species_df)), random_state=seed)
-        sampled_dfs.append(sampled_df)
+        # Filter rows where the specified column matches the species
+        species_df = df.filter(pl.col(column_to_filter) == species)
 
-    # Concatenate all sampled data into a single DataFrame
-    return pd.concat(sampled_dfs, ignore_index=True) if sampled_dfs else pd.DataFrame()
+        # Determine how many rows to sample (do not exceed available rows)
+        n = min(sample_size, species_df.height)
+
+        # Sample if there are enough rows
+        if n > 0:
+            sampled_df = species_df.sample(n=n, seed=seed, with_replacement=False)
+            sampled_dfs.append(sampled_df)
+
+    # Concatenate all sampled DataFrames into a single Polars DataFrame
+    return pl.concat(sampled_dfs) if sampled_dfs else pl.DataFrame()
 
 
-def add_subset_column(df: pd.DataFrame, train_ratio: float, seed: int = 42) -> pd.DataFrame:
+def add_subset_column(
+    df: pl.DataFrame,
+    train_ratio: float,
+    seed: int = 42,
+    tolerance: float = 0.02
+) -> pl.DataFrame:
     """
-    Adds a 'subset' column to the DataFrame, splitting data into 'train' and 'test' subsets.
+    Adds a 'subset' column to the Polars DataFrame, splitting data into 'train', 'val', and 'test' subsets
+    based on unique 'location_id'. Ensures no 'location_id' appears in more than one subset to prevent
+    spatial leakage, and uses a soft balancing approach with tolerance on target ratios.
 
     Parameters:
-        df (pd.DataFrame): The input DataFrame.
-        train_ratio (float): The ratio of the 'train' subset (e.g., 0.8 for 80% train).
+        df (pl.DataFrame): The input Polars DataFrame.
+        train_ratio (float): Target ratio for the 'train' subset (e.g., 0.8 for 80% train).
+                             The remaining portion is split equally into 'val' and 'test'.
         seed (int, optional): Seed for reproducibility. Default is 42.
+        tolerance (float, optional): Acceptable deviation from target ratios (e.g., 0.02 for ±2%).
 
     Returns:
-        pd.DataFrame: The DataFrame with an additional 'subset' column.
+        pl.DataFrame: The DataFrame with an added 'subset' column.
     """
     if not 0 <= train_ratio <= 1:
         raise ValueError('train_ratio must be between 0 and 1.')
 
-    # Set the random seed for reproducibility
-    np.random.seed(seed)
+    # Calculate target ratios and bounds
+    val_test_ratio = (1 - train_ratio) / 2
+    target_ratios = {'train': train_ratio, 'val': val_test_ratio, 'test': val_test_ratio}
+    lower_bounds = {k: v - tolerance for k, v in target_ratios.items()}
+    upper_bounds = {k: v + tolerance for k, v in target_ratios.items()}
 
-    # Generate random values to assign subsets
-    random_values = np.random.rand(len(df))
+    # Get total number of images
+    total_images = df.shape[0]
 
-    # Assign subsets based on the train_ratio
-    df['subset'] = np.where(random_values < train_ratio, 'train', 'test')
+    # Shuffle location IDs
+    unique_locs = df.select('location_id').unique()
+    loc_list = unique_locs['location_id'].to_list()
+    rng = np.random.default_rng(seed)
+    rng.shuffle(loc_list)
+
+    # Compute number of images per location
+    image_counts = df.group_by('location_id').len().rename({'len': 'n_images'})
+    loc_to_n = dict(zip(image_counts['location_id'].to_list(), image_counts['n_images'].to_list()))
+
+    # Assign locations to subsets with soft balancing
+    subsets = {'train': set(), 'val': set(), 'test': set()}
+    counts = {'train': 0, 'val': 0, 'test': 0}
+
+    for loc in loc_list:
+        loc_n = loc_to_n[loc]
+        # Compute current image ratios
+        current_ratios = {k: counts[k] / total_images for k in counts}
+        # Determine candidate subsets within acceptable range
+        candidates = [k for k in current_ratios if current_ratios[k] < upper_bounds[k]]
+        if not candidates:
+            # fallback: choose subset with lowest current ratio
+            candidates = sorted(current_ratios.items(), key=lambda x: x[1])
+            chosen_subset = candidates[0][0]
+        else:
+            # choose randomly among candidates with minimum current ratio
+            min_ratio = min(current_ratios[c] for c in candidates)
+            min_candidates = [c for c in candidates if current_ratios[c] == min_ratio]
+            chosen_subset = rng.choice(min_candidates)
+
+        subsets[chosen_subset].add(loc)
+        counts[chosen_subset] += loc_n
+
+    # Assign subset column
+    df = df.with_columns(
+        pl.when(pl.col('location_id').is_in(subsets['train'])).then(pl.lit('train'))
+        .when(pl.col('location_id').is_in(subsets['val'])).then(pl.lit('val'))
+        .when(pl.col('location_id').is_in(subsets['test'])).then(pl.lit('test'))
+        .otherwise(pl.lit('unknown'))
+        .alias('subset')
+    )
+
+    if df.filter(pl.col('subset') == 'unknown').height > 0:
+        print('⚠️ Warning: Some locations could not be assigned to a subset.')
+
+    # Summary
+    final_counts = df.group_by('subset').len().rename({'len': 'count'}).sort('subset')
+    print(f'ℹ️ Subset distribution:\n{final_counts}')
 
     return df
+
+
+def check_location_split(df: pl.DataFrame) -> None:
+    """
+    Checks whether any 'location_id' appears in more than one subset.
+
+    Parameters:
+        df (pl.DataFrame): The Polars DataFrame containing 'location_id' and 'subset' columns.
+
+    Prints:
+        - A success message if there are no violations.
+        - Otherwise, prints the violating 'location_id's and the number of subsets they appear in.
+    """
+    if 'location_id' not in df.columns or 'subset' not in df.columns:
+        raise ValueError('DataFrame must contain location_id and subset columns.')
+
+    violations = (
+        df.select(['location_id', 'subset'])
+          .unique()
+          .group_by('location_id')
+          .agg(pl.col('subset').n_unique().alias('num_subsets'))
+          .filter(pl.col('num_subsets') > 1)
+    )
+
+    if violations.is_empty():
+        print('✅ No violations found: each location_id appears in only one subset.')
+    else:
+        print(f'❌ Violations found in {violations.height} location_id(s):')
+        print(violations)
 
 
 # from mewc-detect
@@ -158,16 +207,14 @@ def create_class_list_yaml_file(num_classes, class_names, file_path):
         yaml.dump(class_dict, file, default_flow_style=False, sort_keys=True)
 
 
-def sample_images(source_dir, target_dir, samples_per_class, exclude_dir=None, seed=42):
+def sample_images(source_dir, target_dir, samples_per_class, seed=42):
     """
-    Samples a fixed number of images per class from a directory structure, ensuring that
-    validation samples do not overlap with the test dataset.
+    Samples a fixed number of images per class from a directory structure.
 
     Args:
         source_dir (str): Path to the source dataset directory (e.g., test images).
         target_dir (str): Path to the target dataset directory to store sampled data.
         samples_per_class (int): Number of images to sample per class.
-        exclude_dir (str, optional): Path to directory which images have to be excluded during sampling.
         seed (int): Random seed for reproducibility.
     """
     random.seed(seed)
@@ -183,13 +230,6 @@ def sample_images(source_dir, target_dir, samples_per_class, exclude_dir=None, s
 
             # List all files in class directory
             all_images = set(os.listdir(class_path))
-
-            # Exclude certain images
-            if exclude_dir:
-                test_class_path = os.path.join(exclude_dir, class_name)
-                if os.path.exists(test_class_path):
-                    test_images = set(os.listdir(test_class_path))
-                    all_images -= test_images
 
             # Shuffle and select desired number of samples
             all_images = list(all_images)
