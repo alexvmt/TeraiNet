@@ -4,6 +4,10 @@ This repository contains scripts and notebooks to build a species classification
 It can classify 10 different classes (including tigers) in camera trap images, using ML ([MegaDetector](https://github.com/agentmorris/MegaDetector) and EfficientNetV2M),
 open data ([LILA BC](https://lila.science/)), open source tools ([MEWC](https://github.com/zaandahl/mewc)) and free compute resources (Google Colab and Kaggle).
 
+TeraiNet is supposed to be an open source blueprint to enable others to easily and flexibly build their own species classifiers for their own specific use cases.
+All you need is basically a Google and a Kaggle account, and an Internet connection.
+In a nutshell, you select the species you're interested in and run the rest of the pipeline with some (hopefully) minor tweaks here and there.
+
 ![tiger](media/anno_1440.jpg 'tiger')
 
 *Credentials: LILA BC, MegaDetector, own illustration.*
@@ -11,8 +15,8 @@ open data ([LILA BC](https://lila.science/)), open source tools ([MEWC](https://
 
 ## Motivation and relevance
 
-- tigers are an endangered species, NGOs like the [Nepal Tiger Trust](https://www.nepaltigertrust.org/) protect them
-- there is no open and easy way for ecologists/researchers/NGOs to classify their camera trap images with regard to tigers
+- tigers are an endangered species, NGOs like the [Nepal Tiger Trust](https://www.nepaltigertrust.org/) and [WWF Nepal](https://www.wwfnepal.org) protect them
+- there is no open and easy way for ecologists/NGOs to classify their camera trap images with regard to tigers
 - ML and open data/tools can help reduce the amount of manual labor when sifting through large amounts of camera trap images, looking for the needle in the haystack
 - there appears to be no such species classification model focussed on the Terai region in Nepal yet
 - **goal**: train a species classifier focussing on the most relevant species in the Bengal tiger's ecosystem in Nepal, namely the Terai region,
@@ -78,37 +82,37 @@ and make it openly available through [AddaxAI](https://addaxdatascience.com/adda
 3. Log experiments using [Weights & Biases](https://wandb.ai/alexvmt/TeraiNet/overview)
 
 I selected a pre-trained EfficientNetV2M with 54M parameters because it constitutes a good compromise between predictive performance, training time and model size.
-The model has been trained for 50 epochs (early stopping after 31 epochs) with 2000 images per class (250 images per class in the validation set).
+The model has been trained for 50 epochs (early stopping after 43 epochs) with 2,000 images per class (250 images per class in the validation set).
 The model has been evaluated on a test set with 250 images per class.
 
 ### Test set performance overview
 
 - Accuracy: 0.899
-- Precision: 0.900
+- Precision: 0.899
 - Recall: 0.899
 - F1: 0.899
 
 ### Test set performance per class
 
-|                |precision         |recall            |f1-score          |support|
-|----------------|------------------|------------------|------------------|-------|
-|tiger           |1.000             |0.996             |0.998             |250    |
-|leopard         |0.919             |0.868             |0.893             |250    |
-|black_bear      |0.938             |0.968             |0.953             |250    |
-|other_carnivores|0.927             |0.912             |0.919             |250    |
-|deer            |0.911             |0.896             |0.903             |250    |
-|wild_boar       |0.909             |0.916             |0.912             |250    |
-|buffalo         |0.891             |0.884             |0.888             |250    |
-|rhino           |0.843             |0.836             |0.839             |250    |
-|elephant        |0.862             |0.848             |0.855             |250    |
-|bird            |0.801             |0.868             |0.833             |250    |
-|accuracy        |0.899             |0.899             |0.899             |2500   |
-|macro avg       |0.900             |0.899             |0.899             |2500   |
-|weighted avg    |0.900             |0.8992            |0.899             |2500   |
+| Class            | Precision | Recall | F1-Score | Support |
+|------------------|-----------|--------|----------|---------|
+| tiger            | 1.000     | 1.000  | 1.000    | 250     |
+| leopard          | 0.883     | 0.848  | 0.865    | 250     |
+| black_bear       | 0.967     | 0.948  | 0.958    | 250     |
+| other_carnivores | 0.912     | 0.916  | 0.914    | 250     |
+| deer             | 0.893     | 0.868  | 0.880    | 250     |
+| wild_boar        | 0.922     | 0.952  | 0.937    | 250     |
+| buffalo          | 0.879     | 0.932  | 0.905    | 250     |
+| rhino            | 0.863     | 0.832  | 0.847    | 250     |
+| elephant         | 0.853     | 0.812  | 0.832    | 250     |
+| bird             | 0.818     | 0.880  | 0.848    | 250     |
+| **micro avg**    | 0.899     | 0.899  | 0.899    | 2500    |
+| **macro avg**    | 0.899     | 0.899  | 0.899    | 2500    |
+| **weighted avg** | 0.899     | 0.899  | 0.899    | 2500    |
 
 Test set performance for the tiger class is extremely high because the respective images are unrealistically good.
-The performance on the tiger images in `test2` is more realistic (`test2` accuracy: 0.868).
-Most other classes have metrics of ~0.9+. But performance on some classes, including rhino, elephant and bird is somewhat lower.
+The performance on the tiger images in `test2` is more realistic (`test2` accuracy: 0.872).
+Most other classes have metrics of about 0.87-0.96. But performance on some classes, including rhino, elephant and bird is somewhat lower.
 I believe that the quality of the rhino and elephant images is not ideal, e. g. there seem to be mix-ups or even other species included (e. g. zebra).
 Birds tend to be difficult to classify correctly in general.
 
@@ -116,7 +120,8 @@ Birds tend to be difficult to classify correctly in general.
 
 ![confusion_matrix](media/confusion_matrix.png 'confusion_matrix')
 
-There appears to be some confusion between leopard and rhino, other carnivores and buffalo, deer and black bear, buffalo and rhino, rhino and bird, and elephant and bird.
+There appears to be some confusion between leopard and rhino, other carnivores and deer, rhino and buffalo, rhino and bird, and elephant and bird.
+I believe that there are several instances in the present data where there are birds sitting on elephants, which obviously leads to erronous annotations.
 
 *Note: There are only ~300 tiger images on LILA BC. I didn't use them in training and validation but instead put all of them in `test2`
 to examine how the model would potentially generalize to tiger camera trap images from another source than the tiger training images
@@ -125,8 +130,18 @@ to examine how the model would potentially generalize to tiger camera trap image
 ## Deployment
 
 1. Publish model on [HuggingFace](https://huggingface.co/alexvmt/TeraiNet/tree/main)
-2. Integrate and use model in [AddaxAI](https://addaxdatascience.com/addaxai/) (formerly known as EcoAssist)
+2. Deploy model to [AddaxAI](https://addaxdatascience.com/addaxai/)
 
 Join [AI for Conservation Slack](https://beerys.github.io/#slack) and [WILDLABS](https://wildlabs.net/) if you're interested in using technology for conservation.
 
 Feel free to reach out if you have feedback/ideas for new use cases or would like to contribute/collaborate!
+
+## Backlog
+
+- experiment with larger image size (e. g. 384x384 pixels)
+- experiment with more complex model head (e. g. like MEWC)
+- try mixup augmentations
+- use uv, ruff etc. with makefile
+- add unit tests
+- check null values in common_name
+- automatically push/load model to/from HuggingFace
