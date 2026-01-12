@@ -145,3 +145,17 @@ Feel free to reach out if you have feedback/ideas for new use cases or would lik
 - add unit tests
 - check null values in common_name
 - automatically push/load model to/from HuggingFace
+
+## Cite
+
+[Paper](https://github.com/alexvmt/TeraiNet/blob/main/terainet_paper.pdf)
+
+```BibTeX
+@article{Merdian-Tarko2025,
+  title = {TeraiNet: An open-source blueprint for the fast and flexible development of local species classification models},
+  author = {Alexander V. Merdian-Tarko},
+  workshop = {5th International Workshop on Camera Traps, AI, and Ecology},
+  location = {Seatle, WA, U.S. & remote},
+  year = {2025}
+}
+```
