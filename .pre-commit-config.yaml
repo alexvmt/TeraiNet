@@ -29,7 +29,7 @@ repos:
         args:
           - --fix
           - --config=pyproject.toml
-          - --extend-ignore=B018,B015,E501
+          - --extend-ignore=B018,B015,E501,E402,E722
         additional_dependencies: ["ruff==0.6.8"]
         files: \.ipynb$
 

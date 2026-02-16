@@ -26,9 +26,8 @@ for file in "$source_dir"/*; do
     # Skip if it's not a file
     [ -f "$file" ] || continue
 
-    # Extract the base name and extension of the file
+    # Extract the base name of the file
     base_name=$(basename "$file")
-    ext="${file##*.}"
 
     # Construct the new file name by appending class and subset
     new_name="${target_dir}/class_${class_number}_${subset_name}_${base_name}"

@@ -35,7 +35,7 @@ target-version = "py313"
 
 [tool.ruff.lint]
 extend-select = ["F", "E", "W", "B", "I"]
-per-file-ignores = { "*.ipynb" = ["B018", "B015", "E501"] }
+per-file-ignores = { "*.ipynb" = ["B018", "B015", "E501", "E402", "E722"] }
 
 [tool.ty.environment]
 python-version = "3.13"

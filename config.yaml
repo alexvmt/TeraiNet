@@ -9,7 +9,7 @@ classes:
   buffalo: 7
   rhino: 8
   elephant: 9
-  bird: 10  
+  bird: 10
 
 scripts:
   download_images_script: "download_images_from_lila_bc.sh"
