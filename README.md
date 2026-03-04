@@ -141,7 +141,6 @@ Feel free to reach out if you have feedback/ideas for new use cases or would lik
 - experiment with larger image size (e. g. 384x384 pixels)
 - experiment with more complex model head (e. g. like MEWC)
 - try mixup augmentations
-- use uv, ruff etc. with makefile
 - add unit tests
 - check null values in common_name
 - automatically push/load model to/from HuggingFace

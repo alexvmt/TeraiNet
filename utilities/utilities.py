@@ -1,25 +1,20 @@
 import os
-import yaml
-import json
-import shutil
 import random
-import subprocess
+import shutil
+
 import numpy as np
-import pandas as pd
 import polars as pl
+import yaml
 
 
 def load_config(config_path):
-    with open(config_path, 'r') as file:
+    with open(config_path, "r") as file:
         config = yaml.safe_load(file)
     return config
 
 
 def sample_n_images_per_species(
-    df: pl.DataFrame,
-    species_samples_dict: dict,
-    column_to_filter: str,
-    seed: int = 42
+    df: pl.DataFrame, species_samples_dict: dict, column_to_filter: str, seed: int = 42
 ) -> pl.DataFrame:
     """
     Filters and randomly samples a specified number of rows for each species
@@ -56,14 +51,13 @@ def sample_n_images_per_species(
 
 
 def add_subset_column(
-    df: pl.DataFrame,
-    train_ratio: float,
-    seed: int = 42,
-    tolerance: float = 0.02
+    df: pl.DataFrame, train_ratio: float, seed: int = 42, tolerance: float = 0.02
 ) -> pl.DataFrame:
     """
-    Adds a 'subset' column to the Polars DataFrame, splitting data into 'train', 'val', and 'test' subsets
-    based on unique 'location_id'. Ensures no 'location_id' appears in more than one subset to prevent
+    Adds a 'subset' column to the Polars DataFrame,
+    splitting data into 'train', 'val', and 'test' subsets
+    based on unique 'location_id'.
+    Ensures no 'location_id' appears in more than one subset to prevent
     spatial leakage, and uses a soft balancing approach with tolerance on target ratios.
 
     Parameters:
@@ -77,30 +71,31 @@ def add_subset_column(
         pl.DataFrame: The DataFrame with an added 'subset' column.
     """
     if not 0 <= train_ratio <= 1:
-        raise ValueError('train_ratio must be between 0 and 1.')
+        raise ValueError("train_ratio must be between 0 and 1.")
 
     # Calculate target ratios and bounds
     val_test_ratio = (1 - train_ratio) / 2
-    target_ratios = {'train': train_ratio, 'val': val_test_ratio, 'test': val_test_ratio}
-    lower_bounds = {k: v - tolerance for k, v in target_ratios.items()}
+    target_ratios = {"train": train_ratio, "val": val_test_ratio, "test": val_test_ratio}
     upper_bounds = {k: v + tolerance for k, v in target_ratios.items()}
 
     # Get total number of images
     total_images = df.shape[0]
 
     # Shuffle location IDs
-    unique_locs = df.select('location_id').unique()
-    loc_list = unique_locs['location_id'].to_list()
+    unique_locs = df.select("location_id").unique()
+    loc_list = unique_locs["location_id"].to_list()
     rng = np.random.default_rng(seed)
     rng.shuffle(loc_list)
 
     # Compute number of images per location
-    image_counts = df.group_by('location_id').len().rename({'len': 'n_images'})
-    loc_to_n = dict(zip(image_counts['location_id'].to_list(), image_counts['n_images'].to_list()))
+    image_counts = df.group_by("location_id").len().rename({"len": "n_images"})
+    loc_to_n = dict(
+        zip(image_counts["location_id"].to_list(), image_counts["n_images"].to_list(), strict=False)
+    )
 
     # Assign locations to subsets with soft balancing
-    subsets = {'train': set(), 'val': set(), 'test': set()}
-    counts = {'train': 0, 'val': 0, 'test': 0}
+    subsets = {"train": set(), "val": set(), "test": set()}
+    counts = {"train": 0, "val": 0, "test": 0}
 
     for loc in loc_list:
         loc_n = loc_to_n[loc]
@@ -123,19 +118,22 @@ def add_subset_column(
 
     # Assign subset column
     df = df.with_columns(
-        pl.when(pl.col('location_id').is_in(subsets['train'])).then(pl.lit('train'))
-        .when(pl.col('location_id').is_in(subsets['val'])).then(pl.lit('val'))
-        .when(pl.col('location_id').is_in(subsets['test'])).then(pl.lit('test'))
-        .otherwise(pl.lit('unknown'))
-        .alias('subset')
+        pl.when(pl.col("location_id").is_in(subsets["train"]))
+        .then(pl.lit("train"))
+        .when(pl.col("location_id").is_in(subsets["val"]))
+        .then(pl.lit("val"))
+        .when(pl.col("location_id").is_in(subsets["test"]))
+        .then(pl.lit("test"))
+        .otherwise(pl.lit("unknown"))
+        .alias("subset")
     )
 
-    if df.filter(pl.col('subset') == 'unknown').height > 0:
-        print('⚠️ Warning: Some locations could not be assigned to a subset.')
+    if df.filter(pl.col("subset") == "unknown").height > 0:
+        print("⚠️ Warning: Some locations could not be assigned to a subset.")
 
     # Summary
-    final_counts = df.group_by('subset').len().rename({'len': 'count'}).sort('subset')
-    print(f'ℹ️ Subset distribution:\n{final_counts}')
+    final_counts = df.group_by("subset").len().rename({"len": "count"}).sort("subset")
+    print(f"ℹ️ Subset distribution:\n{final_counts}")
 
     return df
 
@@ -151,35 +149,35 @@ def check_location_split(df: pl.DataFrame) -> None:
         - A success message if there are no violations.
         - Otherwise, prints the violating 'location_id's and the number of subsets they appear in.
     """
-    if 'location_id' not in df.columns or 'subset' not in df.columns:
-        raise ValueError('DataFrame must contain location_id and subset columns.')
+    if "location_id" not in df.columns or "subset" not in df.columns:
+        raise ValueError("DataFrame must contain location_id and subset columns.")
 
     violations = (
-        df.select(['location_id', 'subset'])
-          .unique()
-          .group_by('location_id')
-          .agg(pl.col('subset').n_unique().alias('num_subsets'))
-          .filter(pl.col('num_subsets') > 1)
+        df.select(["location_id", "subset"])
+        .unique()
+        .group_by("location_id")
+        .agg(pl.col("subset").n_unique().alias("num_subsets"))
+        .filter(pl.col("num_subsets") > 1)
     )
 
     if violations.is_empty():
-        print('✅ No violations found: each location_id appears in only one subset.')
+        print("✅ No violations found: each location_id appears in only one subset.")
     else:
-        print(f'❌ Violations found in {violations.height} location_id(s):')
+        print(f"❌ Violations found in {violations.height} location_id(s):")
         print(violations)
 
 
 # from mewc-detect
 def contains_animal(json_image):
-    if 'detections' in json_image.keys():
-        n = len(json_image['detections'])
+    if "detections" in json_image.keys():
+        n = len(json_image["detections"])
         animal_there = False
-        for i in range(0,n):
-            if json_image['detections'][i]['category'] == "1":
+        for i in range(0, n):
+            if json_image["detections"][i]["category"] == "1":
                 animal_there = True
-        return(animal_there)
+        return animal_there
     else:
-        return(False)
+        return False
 
 
 def create_class_list_yaml_file(num_classes, class_names, file_path):
@@ -192,7 +190,7 @@ def create_class_list_yaml_file(num_classes, class_names, file_path):
         file_path (str): The full file path where the YAML file will be saved.
     """
     if len(class_names) != num_classes:
-        raise ValueError('The number of class names must match num_classes.')
+        raise ValueError("The number of class names must match num_classes.")
 
     # Ensure the directory exists
     directory = os.path.dirname(file_path)
@@ -203,7 +201,7 @@ def create_class_list_yaml_file(num_classes, class_names, file_path):
     class_dict = {str(i): class_names[i - 1] for i in range(1, num_classes + 1)}
 
     # Write to YAML file
-    with open(file_path, 'w') as file:
+    with open(file_path, "w") as file:
         yaml.dump(class_dict, file, default_flow_style=False, sort_keys=True)
 
 

@@ -65,7 +65,7 @@ paste <(echo "$urls") <(echo "$subsets") | while IFS=$'\t' read -r url subset; d
         echo "Error: URL is unreachable - $url"
         ((failed_download_count++))
     fi
-	
+
 	# Print summary on last iteration
     if [ "$total_urls" -eq "$total_lines" ]; then
         echo "Total URLs: $total_urls"

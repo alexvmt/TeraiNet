@@ -1,0 +1,51 @@
+[project]
+name = "terainet"
+version = "3.0.0"
+description = "TeraiNet"
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "polars",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+    "pyyaml",
+    "tqdm",
+    "wandb",
+    "keras==3.3.3",
+    "kimm==0.2.5",
+    "tensorflow==2.16.1",
+    "tensorflow-datasets",
+    "megadetector",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15.0",
+    "ty>=0.0.15",
+    "pytest>=9.0.2",
+    "pre-commit>=4.5.1",
+    "nbqa>=1.8.5",
+    "nbstripout>=0.7.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+extend-select = ["F", "E", "W", "B", "I"]
+per-file-ignores = { "*.ipynb" = ["B018", "B015", "E501", "E402", "E722"] }
+
+[tool.ty.environment]
+python-version = "3.10"
+
+[tool.ty.src]
+exclude = ["**/*.ipynb"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
