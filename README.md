@@ -12,7 +12,6 @@ In a nutshell, you select the species you're interested in and run the rest of t
 
 *Credentials: LILA BC, MegaDetector, own illustration.*
 
-
 ## Motivation and relevance
 
 - tigers are an endangered species, NGOs like the [Nepal Tiger Trust](https://www.nepaltigertrust.org/) and [WWF Nepal](https://www.wwfnepal.org) protect them
@@ -135,15 +134,6 @@ to examine how the model would potentially generalize to tiger camera trap image
 Join [AI for Conservation Slack](https://beerys.github.io/#slack) and [WILDLABS](https://wildlabs.net/) if you're interested in using technology for conservation.
 
 Feel free to reach out if you have feedback/ideas for new use cases or would like to contribute/collaborate!
-
-## Backlog
-
-- experiment with larger image size (e. g. 384x384 pixels)
-- experiment with more complex model head (e. g. like MEWC)
-- try mixup augmentations
-- add unit tests
-- check null values in common_name
-- automatically push/load model to/from HuggingFace
 
 ## Cite
 
