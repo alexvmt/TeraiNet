@@ -8,7 +8,7 @@ format:
 	uv run ruff format .
 
 typecheck:
-	uv run ty check utilities
+	uv run ty check src/terainet
 
 test:
 	uv run pytest -q

@@ -1,0 +1,13 @@
+classes:
+  num_classes: 3
+  tiger: 1
+  leopard: 2
+  bear: 3
+
+scripts:
+  download_images_script: "download_images.sh"
+
+sampling_downloading:
+  scripts_dir: "scripts"
+  samples_dir: "samples"
+  images_dir: "images"
