@@ -1,9 +1,5 @@
 """Tests for terainet.detection module."""
 
-import json
-
-import pytest
-
 from terainet.detection import contains_animal
 
 

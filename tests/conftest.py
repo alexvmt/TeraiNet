@@ -1,6 +1,5 @@
 """Shared test fixtures and utilities."""
 
-import os
 import tempfile
 from pathlib import Path
 

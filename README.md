@@ -8,6 +8,8 @@ TeraiNet is supposed to be an open source blueprint to enable others to easily a
 All you need is basically a Google and a Kaggle account, and an Internet connection.
 In a nutshell, you select the species you're interested in and run the rest of the pipeline with some (hopefully) minor tweaks here and there.
 
+Feel free to reach out if you have feedback/ideas for new use cases or would like to contribute/collaborate. Join [AI for Conservation Slack](https://beerys.github.io/#slack) and [WILDLABS](https://wildlabs.net/) if you're interested in using technology for conservation.
+
 ![tiger](media/anno_1440.jpg 'tiger')
 
 *Credentials: LILA BC, MegaDetector, own illustration.*
@@ -22,6 +24,9 @@ In a nutshell, you select the species you're interested in and run the rest of t
 and make it openly available through [AddaxAI](https://addaxdatascience.com/addaxai/) (formerly known as EcoAssist)
 
 ## Data preparation
+
+To start, either open the notebooks (step 1-3) in order from here or first clone the repo in your Google Drive.
+For step 4, just open the notebook in Kaggle directly by clicking the respective button below.
 
 ### 1. Select data sources
 
@@ -73,6 +78,8 @@ and make it openly available through [AddaxAI](https://addaxdatascience.com/adda
 *Note: I found access to free GPUs much better and transparent in Kaggle compared to Colab.*
 
 ## Model training and evaluation
+
+To train and evaluate a model, open the notebook in Kaggle directly by clicking the respective button below.
 
 [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/code/alexvmt/train-and-evaluate-terainet/notebook?scriptVersionId=232861979)
 
@@ -131,9 +138,7 @@ to examine how the model would potentially generalize to tiger camera trap image
 1. Publish model on [HuggingFace](https://huggingface.co/alexvmt/TeraiNet/tree/main)
 2. Deploy model to [AddaxAI](https://addaxdatascience.com/addaxai/)
 
-Join [AI for Conservation Slack](https://beerys.github.io/#slack) and [WILDLABS](https://wildlabs.net/) if you're interested in using technology for conservation.
-
-Feel free to reach out if you have feedback/ideas for new use cases or would like to contribute/collaborate!
+There's also an inference example [here](https://www.kaggle.com/code/alexvmt/terainet-inference-example) to use the model directly.
 
 ## Cite
 

@@ -1,7 +1,6 @@
 """Tests for terainet.data module."""
 
 import os
-import tempfile
 
 import polars as pl
 import pytest

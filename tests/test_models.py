@@ -1,7 +1,6 @@
 """Tests for terainet.models module."""
 
 import os
-import tempfile
 
 import pytest
 import yaml
