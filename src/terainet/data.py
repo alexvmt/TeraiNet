@@ -201,27 +201,28 @@ def sample_images(source_dir: str, target_dir: str, samples_per_class: int, seed
 
 def filter_single_snippet_images(
     data_dir: str,
+    target_dir: str,
     exclude_classes: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """
     Filter dataset to keep only images with single snippet extraction.
 
-    From a directory structure with train/val/test subdirectories containing class
+    From a source directory structure with train/val/test subdirectories containing class
     subdirectories, keeps only files ending in -0 (indicating single snippet extraction).
     Files with -1, -2, etc. are removed as they represent multiple snippets from the
     same original image, leading to potentially duplicate or mislabeled data.
 
-    Crash-safe workflow:
-    1. Create temporary filtered directory (e.g. train_filtered_tmp)
-    2. Populate temp directory completely
-    3. Rename original directory to backup
-    4. Atomically rename temp directory to final train/val/test dir
+    Copies filtered images to target_dir, which can be on a different filesystem
+    (useful for Kaggle where input is read-only).
 
     Excluded classes are copied unchanged.
 
     Parameters:
         data_dir:
-            Root directory containing train/val/test subdirectories.
+            Source root directory (read-only) containing train/val/test subdirectories.
+
+        target_dir:
+            Target root directory (writable) where filtered images will be copied.
 
         exclude_classes:
             Class subdirectory names to skip filtering.
@@ -233,46 +234,39 @@ def filter_single_snippet_images(
     Raises:
         ValueError:
             If data_dir does not exist.
-
-        FileExistsError:
-            If backup or temporary directories already exist.
     """
     exclude_classes_set = set(exclude_classes or [])
-    root_path = Path(data_dir)
+    source_path = Path(data_dir)
+    target_root = Path(target_dir)
 
-    if not root_path.exists():
-        raise ValueError(f"Data directory not found: {data_dir}")
+    if not source_path.exists():
+        raise ValueError(f"Source data directory not found: {data_dir}")
+
+    target_root.mkdir(parents=True, exist_ok=True)
+
+    if target_root.exists() and any(target_root.iterdir()):
+        raise FileExistsError(f"Target directory already exists and is not empty: {target_root}")
 
     stats: dict[str, dict[str, Any]] = {}
-
     subsets = ["train", "val", "test"]
 
     for subset in subsets:
-        subset_path = root_path / subset
+        subset_source = source_path / subset
 
-        if not subset_path.exists() or not subset_path.is_dir():
+        if not subset_source.exists() or not subset_source.is_dir():
             logger.warning(
                 "Skipping subset '%s': directory not found",
                 subset,
             )
             continue
 
-        backup_path = root_path / f"{subset}_original_backup"
-        temp_path = root_path / f"{subset}_filtered_tmp"
-
-        # Safer behavior: never overwrite backups or temp dirs
-        if backup_path.exists():
-            raise FileExistsError(f"Backup directory already exists: {backup_path}")
-
-        if temp_path.exists():
-            raise FileExistsError(f"Temporary directory already exists: {temp_path}")
+        subset_target = target_root / subset
+        subset_target.mkdir(parents=True, exist_ok=True)
 
         logger.info(
             "Starting filtering for subset '%s'",
             subset,
         )
-
-        temp_path.mkdir(parents=True, exist_ok=False)
 
         subset_stats: dict[str, Any] = {
             "per_class": {},
@@ -282,18 +276,17 @@ def filter_single_snippet_images(
         }
 
         try:
-            # Build filtered dataset in temp dir first
-            for class_dir in sorted(subset_path.iterdir()):
+            # Process each class directory
+            for class_dir in sorted(subset_source.iterdir()):
                 if not class_dir.is_dir():
                     continue
 
                 class_name = class_dir.name
-                temp_class_dir = temp_path / class_name
-                temp_class_dir.mkdir(parents=True, exist_ok=True)
+                target_class_dir = subset_target / class_name
+                target_class_dir.mkdir(parents=True, exist_ok=True)
 
                 original_count = 0
                 filtered_count = 0
-
                 excluded = class_name in exclude_classes_set
 
                 logger.info(
@@ -315,7 +308,7 @@ def filter_single_snippet_images(
                     if should_copy:
                         shutil.copy2(
                             file_path,
-                            temp_class_dir / file_path.name,
+                            target_class_dir / file_path.name,
                         )
                         filtered_count += 1
 
@@ -357,10 +350,6 @@ def filter_single_snippet_images(
                 else 0.0
             )
 
-            # Atomic-ish swap only after successful temp build
-            subset_path.rename(backup_path)
-            temp_path.rename(subset_path)
-
             logger.info(
                 ("Finished subset='%s': original=%d, filtered=%d, removed=%d, retention=%.2f%%"),
                 subset,
@@ -377,11 +366,6 @@ def filter_single_snippet_images(
                 "Filtering failed for subset '%s'",
                 subset,
             )
-
-            # Cleanup temp dir if something failed
-            if temp_path.exists():
-                shutil.rmtree(temp_path)
-
             raise
 
     return stats

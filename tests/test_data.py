@@ -1,7 +1,6 @@
 """Tests for terainet.data module."""
 
 import os
-from unittest.mock import patch
 
 import polars as pl
 import pytest
@@ -162,17 +161,20 @@ class TestFilterSingleSnippetImages:
         open(os.path.join(class_dir, "image_2-1.jpg"), "a").close()
         open(os.path.join(class_dir, "image_2-2.jpg"), "a").close()
 
-        stats = filter_single_snippet_images(data_dir)
+        target_dir = os.path.join(temp_dir, "filtered")
+        stats = filter_single_snippet_images(data_dir, target_dir)
 
-        # Check backup exists
-        assert os.path.exists(os.path.join(data_dir, "train_original_backup"))
-
-        # Check new filtered directory
-        new_class_dir = os.path.join(data_dir, "train", "class_1")
+        # Check target filtered directory created with correct files
+        new_class_dir = os.path.join(target_dir, "train", "class_1")
+        assert os.path.exists(new_class_dir)
         filtered_files = os.listdir(new_class_dir)
         assert len(filtered_files) == 2
         assert "image_1-0.jpg" in filtered_files
         assert "image_2-0.jpg" in filtered_files
+
+        # Check source directory unchanged
+        original_files = os.listdir(class_dir)
+        assert len(original_files) == 5
 
         # Check statistics
         assert stats["train"]["original_total"] == 5
@@ -194,14 +196,15 @@ class TestFilterSingleSnippetImages:
             open(os.path.join(class_dir, "img-0.jpg"), "a").close()
             open(os.path.join(class_dir, "img-1.jpg"), "a").close()
 
-        stats = filter_single_snippet_images(data_dir)
+        target_dir = os.path.join(temp_dir, "filtered")
+        stats = filter_single_snippet_images(data_dir, target_dir)
 
         # Check all subsets processed
         for subset in ["train", "val", "test"]:
             assert subset in stats
             assert stats[subset]["original_total"] == 2
             assert stats[subset]["filtered_total"] == 1
-            assert os.path.exists(os.path.join(data_dir, f"{subset}_original_backup"))
+            assert os.path.exists(os.path.join(target_dir, subset, "class_1"))
 
     def test_filter_single_snippet_exclude_classes(self, temp_dir):
         """Test exclude_classes parameter."""
@@ -216,8 +219,10 @@ class TestFilterSingleSnippetImages:
             open(os.path.join(class_dir, "img-0.jpg"), "a").close()
             open(os.path.join(class_dir, "img-1.jpg"), "a").close()
 
+        target_dir = os.path.join(temp_dir, "filtered")
         stats = filter_single_snippet_images(
             data_dir,
+            target_dir,
             exclude_classes=["class_2"],
         )
 
@@ -231,7 +236,7 @@ class TestFilterSingleSnippetImages:
         assert stats["train"]["per_class"]["class_2"]["filtered"] == 2
         assert stats["train"]["per_class"]["class_2"]["removed"] == 0
 
-        new_class_2_dir = os.path.join(data_dir, "train", "class_2")
+        new_class_2_dir = os.path.join(target_dir, "train", "class_2")
 
         assert os.path.exists(new_class_2_dir)
 
@@ -244,9 +249,10 @@ class TestFilterSingleSnippetImages:
     def test_filter_single_snippet_missing_data_dir(self, temp_dir):
         """Test error handling for missing data directory."""
         nonexistent_dir = os.path.join(temp_dir, "nonexistent")
+        target_dir = os.path.join(temp_dir, "target")
 
-        with pytest.raises(ValueError, match="Data directory not found"):
-            filter_single_snippet_images(nonexistent_dir)
+        with pytest.raises(ValueError, match="Source data directory not found"):
+            filter_single_snippet_images(nonexistent_dir, target_dir)
 
     def test_filter_single_snippet_missing_subset(self, temp_dir):
         """Test handling of missing subset directories."""
@@ -258,7 +264,8 @@ class TestFilterSingleSnippetImages:
         os.makedirs(class_dir)
         open(os.path.join(class_dir, "img-0.jpg"), "a").close()
 
-        stats = filter_single_snippet_images(data_dir)
+        target_dir = os.path.join(temp_dir, "filtered")
+        stats = filter_single_snippet_images(data_dir, target_dir)
 
         # Should only have train in stats
         assert "train" in stats
@@ -281,63 +288,28 @@ class TestFilterSingleSnippetImages:
         for filename in filenames:
             open(os.path.join(class_dir, filename), "a").close()
 
-        filter_single_snippet_images(data_dir)
+        target_dir = os.path.join(temp_dir, "filtered")
+        filter_single_snippet_images(data_dir, target_dir)
 
-        new_class_dir = os.path.join(data_dir, "train", "class_1")
+        new_class_dir = os.path.join(target_dir, "train", "class_1")
         filtered_files = os.listdir(new_class_dir)
 
         assert len(filtered_files) == 3
         for filename in filenames:
             assert filename in filtered_files
 
-    def test_filter_single_snippet_existing_backup_raises(self, temp_dir):
-        """Test existing backup directory raises error."""
-        data_dir = temp_dir
-
-        train_dir = os.path.join(data_dir, "train", "class_1")
-        os.makedirs(train_dir)
-
-        open(os.path.join(train_dir, "img-0.jpg"), "a").close()
-
-        backup_dir = os.path.join(data_dir, "train_original_backup")
-        os.makedirs(backup_dir)
-
-        with pytest.raises(FileExistsError, match="Backup directory already exists"):
-            filter_single_snippet_images(data_dir)
-
-    def test_filter_single_snippet_existing_temp_dir_raises(self, temp_dir):
-        """Test existing temp directory raises error."""
-        data_dir = temp_dir
-
-        train_dir = os.path.join(data_dir, "train", "class_1")
-        os.makedirs(train_dir)
-
-        open(os.path.join(train_dir, "img-0.jpg"), "a").close()
-
-        temp_filtered_dir = os.path.join(data_dir, "train_filtered_tmp")
-        os.makedirs(temp_filtered_dir)
-
-        with pytest.raises(FileExistsError, match="Temporary directory already exists"):
-            filter_single_snippet_images(data_dir)
-
-    def test_filter_single_snippet_cleanup_on_failure(self, temp_dir):
-        """Test temp directory cleanup if processing fails."""
-        data_dir = temp_dir
+    def test_filter_single_snippet_existing_nonempty_target_raises(self, temp_dir):
+        """Test error raised when target directory already exists and is non-empty."""
+        data_dir = os.path.join(temp_dir, "source")
+        target_dir = os.path.join(temp_dir, "filtered")
 
         class_dir = os.path.join(data_dir, "train", "class_1")
         os.makedirs(class_dir)
 
         open(os.path.join(class_dir, "img-0.jpg"), "a").close()
 
-        with patch("shutil.copy2", side_effect=RuntimeError("copy failed")):
-            with pytest.raises(RuntimeError, match="copy failed"):
-                filter_single_snippet_images(data_dir)
+        os.makedirs(target_dir)
+        open(os.path.join(target_dir, "stale_file.txt"), "a").close()
 
-        # Original dataset should still exist
-        assert os.path.exists(os.path.join(data_dir, "train"))
-
-        # Temp directory should be cleaned up
-        assert not os.path.exists(os.path.join(data_dir, "train_filtered_tmp"))
-
-        # Backup should not exist because swap never happened
-        assert not os.path.exists(os.path.join(data_dir, "train_original_backup"))
+        with pytest.raises(FileExistsError):
+            filter_single_snippet_images(data_dir, target_dir)
