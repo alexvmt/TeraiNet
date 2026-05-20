@@ -5,11 +5,18 @@ from __future__ import annotations
 import logging
 import random
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import polars as pl
+
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    force=True,
+)
 
 logger = logging.getLogger(__name__)
 
