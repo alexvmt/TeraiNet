@@ -1,6 +1,6 @@
 """Model utilities for TeraiNet. Adapted from MEWC."""
 
-import os
+from pathlib import Path
 
 import yaml
 
@@ -24,13 +24,12 @@ def create_class_list_yaml_file(num_classes: int, class_names: list[str], file_p
         raise ValueError("The number of class names must match num_classes.")
 
     # Ensure the directory exists
-    directory = os.path.dirname(file_path)
-    if directory and not os.path.exists(directory):
-        os.makedirs(directory)
+    file_path_obj = Path(file_path)
+    file_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
     # Create a dictionary with indices as keys and class names as values
     class_dict = {str(i): class_names[i - 1] for i in range(1, num_classes + 1)}
 
     # Write to YAML file
-    with open(file_path, "w") as file:
+    with open(file_path_obj, "w") as file:
         yaml.dump(class_dict, file, default_flow_style=False, sort_keys=True)

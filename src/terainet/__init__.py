@@ -4,6 +4,7 @@ from terainet.config import load_config
 from terainet.data import (
     add_subset_column,
     check_location_split,
+    filter_single_snippet_images,
     sample_images,
     sample_n_images_per_species,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "sample_n_images_per_species",
     "add_subset_column",
     "check_location_split",
+    "filter_single_snippet_images",
     "contains_animal",
     "create_class_list_yaml_file",
     "sample_images",

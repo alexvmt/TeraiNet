@@ -1,11 +1,24 @@
 """Data utilities for TeraiNet."""
 
-import os
+from __future__ import annotations
+
+import logging
 import random
 import shutil
+import sys
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import polars as pl
+
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    force=True,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def sample_n_images_per_species(
@@ -116,10 +129,10 @@ def add_subset_column(
     )
 
     if df.filter(pl.col("subset") == "unknown").height > 0:
-        print("⚠️ Warning: Some locations could not be assigned to a subset.")
+        logger.warning("Some locations could not be assigned to a subset.")
 
     final_counts = df.group_by("subset").len().rename({"len": "count"}).sort("subset")
-    print(f"ℹ️ Subset distribution:\n{final_counts}")
+    logger.info(f"Subset distribution:\n{final_counts}")
 
     return df
 
@@ -153,10 +166,10 @@ def check_location_split(df: pl.DataFrame) -> None:
     )
 
     if violations.is_empty():
-        print("✅ No violations found: each location_id appears in only one subset.")
+        logger.info("No violations found: each location_id appears in only one subset.")
     else:
-        print(f"❌ Violations found in {violations.height} location_id(s):")
-        print(violations)
+        logger.warning(f"Violations found in {violations.height} location_id(s):")
+        logger.warning(f"{violations}")
 
 
 def sample_images(source_dir: str, target_dir: str, samples_per_class: int, seed: int = 42) -> None:
@@ -175,20 +188,191 @@ def sample_images(source_dir: str, target_dir: str, samples_per_class: int, seed
     """
     random.seed(seed)
 
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
+    source_path = Path(source_dir)
+    target_path = Path(target_dir)
+    target_path.mkdir(parents=True, exist_ok=True)
 
-    for class_name in os.listdir(source_dir):
-        class_path = os.path.join(source_dir, class_name)
-        if os.path.isdir(class_path):
-            sampled_class_dir = os.path.join(target_dir, class_name)
-            os.makedirs(sampled_class_dir, exist_ok=True)
+    for class_dir in source_path.iterdir():
+        if class_dir.is_dir():
+            sampled_class_dir = target_path / class_dir.name
+            sampled_class_dir.mkdir(parents=True, exist_ok=True)
 
-            all_images = list(os.listdir(class_path))
+            all_images = list(class_dir.iterdir())
             random.shuffle(all_images)
             sampled_images = all_images[:samples_per_class]
 
-            for image_name in sampled_images:
-                source_image_path = os.path.join(class_path, image_name)
-                target_image_path = os.path.join(sampled_class_dir, image_name)
-                shutil.copy(source_image_path, target_image_path)
+            for image_path in sampled_images:
+                target_image_path = sampled_class_dir / image_path.name
+                shutil.copy(image_path, target_image_path)
+
+
+def filter_single_snippet_images(
+    data_dir: str,
+    target_dir: str,
+    exclude_classes: list[str] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """
+    Filter dataset to keep only images with single snippet extraction.
+
+    From a source directory structure with train/val/test subdirectories containing class
+    subdirectories, keeps only files ending in -0 (indicating single snippet extraction).
+    Files with -1, -2, etc. are removed as they represent multiple snippets from the
+    same original image, leading to potentially duplicate or mislabeled data.
+
+    Copies filtered images to target_dir, which can be on a different filesystem
+    (useful for Kaggle where input is read-only).
+
+    Excluded classes are copied unchanged.
+
+    Parameters:
+        data_dir:
+            Source root directory (read-only) containing train/val/test subdirectories.
+
+        target_dir:
+            Target root directory (writable) where filtered images will be copied.
+
+        exclude_classes:
+            Class subdirectory names to skip filtering.
+            These classes are copied unchanged.
+
+    Returns:
+        Dictionary containing filtering statistics per subset and class.
+
+    Raises:
+        ValueError:
+            If data_dir does not exist.
+    """
+    exclude_classes_set = set(exclude_classes or [])
+    source_path = Path(data_dir)
+    target_root = Path(target_dir)
+
+    if not source_path.exists():
+        raise ValueError(f"Source data directory not found: {data_dir}")
+
+    target_root.mkdir(parents=True, exist_ok=True)
+
+    if target_root.exists() and any(target_root.iterdir()):
+        raise FileExistsError(f"Target directory already exists and is not empty: {target_root}")
+
+    stats: dict[str, dict[str, Any]] = {}
+    subsets = ["train", "val", "test"]
+
+    for subset in subsets:
+        subset_source = source_path / subset
+
+        if not subset_source.exists() or not subset_source.is_dir():
+            logger.warning(
+                "Skipping subset '%s': directory not found",
+                subset,
+            )
+            continue
+
+        subset_target = target_root / subset
+        subset_target.mkdir(parents=True, exist_ok=True)
+
+        logger.info(
+            "Starting filtering for subset '%s'",
+            subset,
+        )
+
+        subset_stats: dict[str, Any] = {
+            "per_class": {},
+            "original_total": 0,
+            "filtered_total": 0,
+            "removed_total": 0,
+        }
+
+        try:
+            # Process each class directory
+            for class_dir in sorted(subset_source.iterdir()):
+                if not class_dir.is_dir():
+                    continue
+
+                class_name = class_dir.name
+                target_class_dir = subset_target / class_name
+                target_class_dir.mkdir(parents=True, exist_ok=True)
+
+                original_count = 0
+                filtered_count = 0
+                excluded = class_name in exclude_classes_set
+
+                logger.info(
+                    "Processing subset='%s', class='%s', mode='%s'",
+                    subset,
+                    class_name,
+                    "copy_unchanged" if excluded else "filter_single_snippet",
+                )
+
+                # Streaming iteration instead of loading all files into memory
+                for file_path in class_dir.iterdir():
+                    if not file_path.is_file():
+                        continue
+
+                    original_count += 1
+
+                    should_copy = excluded or file_path.stem.endswith("-0")
+
+                    if should_copy:
+                        shutil.copy2(
+                            file_path,
+                            target_class_dir / file_path.name,
+                        )
+                        filtered_count += 1
+
+                removed_count = original_count - filtered_count
+
+                subset_stats["per_class"][class_name] = {
+                    "original": original_count,
+                    "filtered": filtered_count,
+                    "removed": removed_count,
+                }
+
+                subset_stats["original_total"] += original_count
+                subset_stats["filtered_total"] += filtered_count
+
+                retention_pct = (
+                    (filtered_count / original_count * 100) if original_count > 0 else 0.0
+                )
+
+                logger.info(
+                    (
+                        "Completed subset='%s', class='%s': "
+                        "original=%d, filtered=%d, removed=%d, retention=%.2f%%"
+                    ),
+                    subset,
+                    class_name,
+                    original_count,
+                    filtered_count,
+                    removed_count,
+                    retention_pct,
+                )
+
+            subset_stats["removed_total"] = (
+                subset_stats["original_total"] - subset_stats["filtered_total"]
+            )
+
+            total_retention_pct = (
+                (subset_stats["filtered_total"] / subset_stats["original_total"] * 100)
+                if subset_stats["original_total"] > 0
+                else 0.0
+            )
+
+            logger.info(
+                ("Finished subset='%s': original=%d, filtered=%d, removed=%d, retention=%.2f%%"),
+                subset,
+                subset_stats["original_total"],
+                subset_stats["filtered_total"],
+                subset_stats["removed_total"],
+                total_retention_pct,
+            )
+
+            stats[subset] = subset_stats
+
+        except Exception:
+            logger.exception(
+                "Filtering failed for subset '%s'",
+                subset,
+            )
+            raise
+
+    return stats
