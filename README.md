@@ -81,57 +81,51 @@ For step 4, just open the notebook in Kaggle directly by clicking the respective
 
 To train and evaluate a model, open the notebook in Kaggle directly by clicking the respective button below.
 
-[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/code/alexvmt/train-and-evaluate-terainet/notebook?scriptVersionId=232861979)
+[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/code/alexvmt/train-and-evaluate-terainet)
 
 1. Use [Keras Image Models](https://github.com/james77777778/keras-image-models)
 2. Follow [mewc-flow](https://github.com/zaandahl/mewc-flow/blob/main/requirements.txt) and [mewc-train](https://github.com/zaandahl/mewc-train)
 3. Log experiments using [Weights & Biases](https://wandb.ai/alexvmt/TeraiNet/overview)
 
 I selected a pre-trained EfficientNetV2M with 54M parameters because it constitutes a good compromise between predictive performance, training time and model size.
-The model has been trained for 50 epochs (early stopping after 43 epochs) with 2,000 images per class (250 images per class in the validation set).
-The model has been evaluated on a test set with 250 images per class.
+The model has been trained for 35 epochs (with early stopping) with about 2,000 images per class (250 images per class in the validation set). The model has been evaluated on a separate test set with 250 images per class.
+
+*Note: There are only ~300 tiger images on LILA BC. I didn't use them in training and validation but instead put all of them in `test2` to examine how the model would potentially generalize to tiger camera trap images from another source than the tiger training images (like it would be the case with the Nepal Tiger Trust using the model on their own images through AddaxAI, for example).*
+
+*Note: As an extension to the underlying paper, to reduce label ambiguity in the data, images were removed if containing more than one animal detection. This was done to address cases where the image-level label did not reliably correspond to the cropped animal region, such as images containing multiple species (e.g., a bird sitting on an elephant) or incorrect crop assignments caused by generic animal detection. Although this filtering reduced the overall amount of data, it substantially improved label consistency and reduced structured supervision noise. The resulting model shows a clear performance increase, particularly for previously confusion-prone classes such as bird, rhino, elephant, and leopard, indicating that improved data quality outweighed the loss in dataset size. The main exception was the deer class, which showed a slight decline in recall and F1-score, likely because the filtering step disproportionately removed valid multi-individual or herd images that are common for deer in camera trap datasets.*
 
 ### Test set performance overview
 
-- Accuracy: 0.899
-- Precision: 0.899
-- Recall: 0.899
-- F1: 0.899
+- Accuracy: 0.935
+- Precision: 0.936
+- Recall: 0.935
+- F1-Score: 0.935
 
 ### Test set performance per class
 
 | Class            | Precision | Recall | F1-Score | Support |
 |------------------|-----------|--------|----------|---------|
-| tiger            | 1.000     | 1.000  | 1.000    | 250     |
-| leopard          | 0.883     | 0.848  | 0.865    | 250     |
-| black_bear       | 0.967     | 0.948  | 0.958    | 250     |
-| other_carnivores | 0.912     | 0.916  | 0.914    | 250     |
-| deer             | 0.893     | 0.868  | 0.880    | 250     |
-| wild_boar        | 0.922     | 0.952  | 0.937    | 250     |
-| buffalo          | 0.879     | 0.932  | 0.905    | 250     |
-| rhino            | 0.863     | 0.832  | 0.847    | 250     |
-| elephant         | 0.853     | 0.812  | 0.832    | 250     |
-| bird             | 0.818     | 0.880  | 0.848    | 250     |
-| **micro avg**    | 0.899     | 0.899  | 0.899    | 2500    |
-| **macro avg**    | 0.899     | 0.899  | 0.899    | 2500    |
-| **weighted avg** | 0.899     | 0.899  | 0.899    | 2500    |
+| tiger            | 1.000     | 0.992  | 0.996    | 250     |
+| leopard          | 0.955     | 0.932  | 0.943    | 250     |
+| black_bear       | 0.956     | 0.956  | 0.956    | 250     |
+| other_carnivores | 0.894     | 0.940  | 0.916    | 250     |
+| deer             | 0.935     | 0.864  | 0.898    | 250     |
+| wild_boar        | 0.987     | 0.900  | 0.941    | 250     |
+| buffalo          | 0.910     | 0.968  | 0.938    | 250     |
+| rhino            | 0.894     | 0.912  | 0.903    | 250     |
+| elephant         | 0.908     | 0.952  | 0.930    | 250     |
+| bird             | 0.925     | 0.936  | 0.930    | 250     |
+| **micro avg**    | 0.935     | 0.935  | 0.935    | 2500    |
+| **macro avg**    | 0.936     | 0.935  | 0.935    | 2500    |
+| **weighted avg** | 0.936     | 0.935  | 0.935    | 2500    |
 
-Test set performance for the tiger class is extremely high because the respective images are unrealistically good.
-The performance on the tiger images in `test2` is more realistic (`test2` accuracy: 0.872).
-Most other classes have metrics of about 0.87-0.96. But performance on some classes, including rhino, elephant and bird is somewhat lower.
-I believe that the quality of the rhino and elephant images is not ideal, e. g. there seem to be mix-ups or even other species included (e. g. zebra).
-Birds tend to be difficult to classify correctly in general.
+*Note: Test set performance for the tiger class is extremely high because the respective images are unrealistically good. The performance on the tiger images in `test2` is more realistic (`test2` accuracy: 0.895).*
 
 ### Test set confusion matrix
 
 ![confusion_matrix](media/confusion_matrix.png 'confusion_matrix')
 
-There appears to be some confusion between leopard and rhino, other carnivores and deer, rhino and buffalo, rhino and bird, and elephant and bird.
-I believe that there are several instances in the present data where there are birds sitting on elephants, which obviously leads to erronous annotations.
-
-*Note: There are only ~300 tiger images on LILA BC. I didn't use them in training and validation but instead put all of them in `test2`
-to examine how the model would potentially generalize to tiger camera trap images from another source than the tiger training images
-(like it would be the case with the Nepal Tiger Trust using the model on their own images through AddaxAI, for example).*
+*Note: The previously present confusion between certain classes is largely gone - at the slight expense of the performance on the deer class though.*
 
 ## Deployment
 
