@@ -1,5 +1,41 @@
+# Data directories
 images/
 megadetector/
 model/
 temp/
+snips/
+
+# Python artifacts
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.tox/
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter/Notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+*.nbstripout
+*_checkpoint.ipynb
+
+# Environment
+.env
+.venv
+venv/
+ENV/
