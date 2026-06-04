@@ -1,35 +1,28 @@
 ---
-name: camera-trap-ml-workflow
-description: Wildlife camera trap classification workflows and dataset handling conventions.
+name: camera-trap-ml
+description: Camera trap image classification and wildlife ML workflows.
 ---
 
 # When To Use
 
 Use this skill when:
-- handling wildlife image datasets
-- implementing species classification workflows
-- implementing augmentation pipelines
-- working with camera trap imagery
-- handling label mappings or metadata
 
-# When Not To Use
-
-Do not use this skill for:
-- TensorFlow architecture implementation details
-- generic repository refactoring
-- experiment tracking setup only
+- working with camera trap datasets
+- implementing species classification
+- handling label mappings
+- creating augmentation strategies
+- evaluating wildlife classifiers
 
 # Highest Priority Constraints
 
 - Assume class imbalance exists.
-- Preserve label consistency across workflows.
-- Keep preprocessing deterministic for validation and inference.
+- Preserve label consistency.
 - Preserve metadata when useful.
+- Keep validation deterministic.
 
 # Canonical Workflow
 
-camera trap dataset
-→ validation and schema checks
+dataset validation
 → preprocessing
 → augmentation
 → train/validation/test split
@@ -39,30 +32,27 @@ camera trap dataset
 
 # Dataset Rules
 
-- Validate dataset schemas explicitly.
-- Validate image paths before training.
+- Validate image paths.
+- Validate dataset schemas.
 - Handle missing values explicitly.
-- Keep train/validation/test separation explicit.
-- Preserve label mappings consistently.
-
-# Augmentation Rules
-
-- Keep validation augmentations deterministic.
-- Separate train and inference transforms.
-- Document augmentations clearly.
-- Preserve aspect ratio when appropriate.
+- Preserve label mappings.
 
 # Evaluation Rules
 
 - Inspect per-class metrics.
-- Validate minority-class performance explicitly.
-- Check confusion matrices for ecologically similar species.
-- Validate label mapping consistency.
+- Review confusion matrices.
+- Evaluate minority species performance.
+- Check for label mapping inconsistencies.
+
+# Augmentation Rules
+
+- Use augmentations only for training.
+- Keep validation deterministic.
+- Document augmentation assumptions.
 
 # Anti-Patterns
 
-- Do not apply random augmentations during validation.
-- Do not mix label mappings between datasets.
-- Do not assume balanced datasets.
-- Do not silently drop failed image loads.
-- Do not duplicate preprocessing logic.
+- random validation augmentations
+- changing label mappings mid-workflow
+- assuming balanced datasets
+- silently dropping failed images
