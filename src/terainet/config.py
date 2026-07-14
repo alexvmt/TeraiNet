@@ -116,6 +116,12 @@ def load_training_config(config_path: str | Path) -> TrainingConfig:
     missing_subsets = required_subsets - set(subset_dirs)
     if missing_subsets:
         raise ValueError(f"dataset.subsets is missing required subsets: {sorted(missing_subsets)}")
+    missing_sample_subsets = required_subsets - set(sample_counts)
+    if missing_sample_subsets:
+        raise ValueError(
+            "dataset.samples_per_class is missing required subsets: "
+            f"{sorted(missing_sample_subsets)}"
+        )
     unknown_sample_subsets = set(sample_counts) - required_subsets
     if unknown_sample_subsets:
         raise ValueError(
@@ -134,6 +140,18 @@ def load_training_config(config_path: str | Path) -> TrainingConfig:
     if len(set(ordered_class_directories)) != len(ordered_class_directories):
         raise ValueError("dataset.class_directories values must be unique.")
 
+    excluded_class_directories = dataset_config.get("exclude_classes_from_filtering", [])
+    if not isinstance(excluded_class_directories, list) or not all(
+        isinstance(class_directory, str) for class_directory in excluded_class_directories
+    ):
+        raise ValueError("dataset.exclude_classes_from_filtering must be a list of strings.")
+    unknown_excluded_classes = set(excluded_class_directories) - set(ordered_class_directories)
+    if unknown_excluded_classes:
+        raise ValueError(
+            "dataset.exclude_classes_from_filtering contains unknown class directories: "
+            f"{sorted(unknown_excluded_classes)}"
+        )
+
     raw_prefix_policy = dataset_config.get("raw_prefix_validation_sampling")
     if raw_prefix_policy is not None:
         if not isinstance(raw_prefix_policy, dict):
@@ -142,6 +160,19 @@ def load_training_config(config_path: str | Path) -> TrainingConfig:
         if class_name not in class_names:
             raise ValueError(
                 "raw_prefix_validation_sampling.class_name must be a configured class."
+            )
+        required_policy_keys = {"class_name", "source_subset", "target_subset"}
+        missing_policy_keys = required_policy_keys - set(raw_prefix_policy)
+        if missing_policy_keys:
+            raise ValueError(
+                "raw_prefix_validation_sampling is missing required keys: "
+                f"{sorted(missing_policy_keys)}"
+            )
+        if raw_prefix_policy["source_subset"] not in subset_dirs:
+            raise ValueError("raw_prefix_validation_sampling.source_subset is not configured.")
+        if raw_prefix_policy["target_subset"] not in sample_counts:
+            raise ValueError(
+                "raw_prefix_validation_sampling.target_subset must be a sampled subset."
             )
 
     config_dir = path.parent
@@ -153,9 +184,7 @@ def load_training_config(config_path: str | Path) -> TrainingConfig:
         subsets={name: str(directory) for name, directory in subset_dirs.items()},
         samples_per_class={name: int(count) for name, count in sample_counts.items()},
         filter_single_snippets=bool(dataset_config.get("filter_single_snippets", False)),
-        exclude_classes_from_filtering=tuple(
-            dataset_config.get("exclude_classes_from_filtering", [])
-        ),
+        exclude_classes_from_filtering=tuple(excluded_class_directories),
         raw_prefix_validation_sampling=raw_prefix_policy,
     )
 
@@ -185,6 +214,17 @@ def load_training_config(config_path: str | Path) -> TrainingConfig:
     artifact_paths = {
         name: _resolve_path(value, config_dir) for name, value in artifact_config.items()
     }
+    required_artifacts = {
+        "model",
+        "class_list",
+        "effective_config",
+        "preparation_summary",
+        "classification_report",
+        "confusion_matrix",
+    }
+    missing_artifacts = required_artifacts - set(artifact_paths)
+    if missing_artifacts:
+        raise ValueError(f"artifacts is missing required paths: {sorted(missing_artifacts)}")
     if len(set(artifact_paths.values())) != len(artifact_paths):
         raise ValueError("Artifact paths must be distinct.")
 

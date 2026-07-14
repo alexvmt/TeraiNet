@@ -89,3 +89,27 @@ def test_load_training_config_rejects_non_contiguous_class_indices(tmp_path):
 
     with pytest.raises(ValueError, match="contiguous"):
         load_training_config(config_path)
+
+
+def test_load_training_config_rejects_missing_sample_subset(tmp_path):
+    """All train, validation, and test sample counts are required."""
+    config_path = tmp_path / "training.yaml"
+    _write_training_config(config_path)
+    config = yaml.safe_load(config_path.read_text())
+    del config["dataset"]["samples_per_class"]["val"]
+    config_path.write_text(yaml.safe_dump(config))
+
+    with pytest.raises(ValueError, match="missing required subsets"):
+        load_training_config(config_path)
+
+
+def test_load_training_config_rejects_unknown_filter_exclusion(tmp_path):
+    """Filtering exclusions must use configured class directory names."""
+    config_path = tmp_path / "training.yaml"
+    _write_training_config(config_path)
+    config = yaml.safe_load(config_path.read_text())
+    config["dataset"]["exclude_classes_from_filtering"] = ["class_99"]
+    config_path.write_text(yaml.safe_dump(config))
+
+    with pytest.raises(ValueError, match="unknown class directories"):
+        load_training_config(config_path)

@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
@@ -10,6 +11,7 @@ from terainet.data import (
     add_subset_column,
     check_location_split,
     filter_single_snippet_images,
+    prepare_training_data,
     sample_images,
     sample_n_images_per_species,
     sample_validation_images_excluding_raw_prefixes,
@@ -174,6 +176,40 @@ class TestSampleImages:
 
         assert len(os.listdir(os.path.join(target_dir, "class_1"))) == 2
 
+    def test_sample_images_skips_intentionally_absent_class_directory(self, temp_dir):
+        """A class created by a later split policy need not exist in this source subset."""
+        source_dir = os.path.join(temp_dir, "source")
+        class_2_dir = os.path.join(source_dir, "class_2")
+        os.makedirs(class_2_dir)
+        for index in range(2):
+            open(os.path.join(class_2_dir, f"image_{index}.jpg"), "a").close()
+
+        target_dir = os.path.join(temp_dir, "sampled")
+        sample_images(
+            source_dir,
+            target_dir,
+            samples_per_class=2,
+            class_directories=("class_1", "class_2"),
+            skip_class_directories={"class_1"},
+        )
+
+        assert not os.path.exists(os.path.join(target_dir, "class_1"))
+        assert len(os.listdir(os.path.join(target_dir, "class_2"))) == 2
+
+    def test_sample_images_rejects_unknown_skipped_class_directory(self, temp_dir):
+        """Typos in skipped class names fail before data is sampled."""
+        source_dir = os.path.join(temp_dir, "source")
+        os.makedirs(os.path.join(source_dir, "class_1"))
+
+        with pytest.raises(ValueError, match="Cannot skip unknown"):
+            sample_images(
+                source_dir,
+                os.path.join(temp_dir, "sampled"),
+                samples_per_class=0,
+                class_directories=("class_1",),
+                skip_class_directories={"class_99"},
+            )
+
 
 def test_sample_validation_images_excluding_raw_prefixes(temp_dir):
     """Validation sampling excludes every raw image represented in training."""
@@ -196,6 +232,52 @@ def test_sample_validation_images_excluding_raw_prefixes(temp_dir):
     )
 
     assert {path.split("-")[0] for path in os.listdir(target_dir)} == {"raw2", "raw3"}
+
+
+def test_prepare_training_data_creates_missing_policy_target_class(temp_dir):
+    """Raw-prefix validation sampling owns an intentionally missing target class."""
+    input_dir = Path(temp_dir) / "input"
+    for subset in ("train", "val", "test"):
+        for class_directory in ("class_1", "class_2"):
+            if subset == "val" and class_directory == "class_1":
+                continue
+            class_path = input_dir / subset / class_directory
+            class_path.mkdir(parents=True)
+            filenames = (
+                ["raw1-0.jpg", "raw2-0.jpg", "raw3-0.jpg"]
+                if subset == "train" and class_directory == "class_1"
+                else ["image1.jpg", "image2.jpg"]
+            )
+            for filename in filenames:
+                (class_path / filename).touch()
+
+    config = SimpleNamespace(
+        class_names=("tiger", "leopard"),
+        seed=42,
+        dataset=SimpleNamespace(
+            images_input_dir=input_dir,
+            images_filtered_dir=Path(temp_dir) / "filtered",
+            images_sampled_dir=Path(temp_dir) / "sampled",
+            class_directories=("class_1", "class_2"),
+            subsets={"train": "train", "val": "val", "test": "test"},
+            samples_per_class={"train": 1, "val": 1, "test": 1},
+            filter_single_snippets=False,
+            exclude_classes_from_filtering=(),
+            raw_prefix_validation_sampling={
+                "class_name": "tiger",
+                "source_subset": "train",
+                "target_subset": "val",
+            },
+        ),
+    )
+
+    result = prepare_training_data(config)
+
+    train_filenames = os.listdir(result.sampled_subset_paths["train"] / "class_1")
+    validation_filenames = os.listdir(result.sampled_subset_paths["val"] / "class_1")
+    assert len(validation_filenames) == 1
+    assert train_filenames[0].split("-")[0] != validation_filenames[0].split("-")[0]
+    assert result.samples_per_subset["val"]["class_1"] == 1
 
 
 class TestFilterSingleSnippetImages:

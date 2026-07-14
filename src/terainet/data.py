@@ -190,6 +190,7 @@ def sample_images(
     seed: int = 42,
     class_directories: tuple[str, ...] | None = None,
     source_paths_by_class: dict[str, Path] | None = None,
+    skip_class_directories: set[str] | None = None,
 ) -> None:
     """
     Sample a fixed number of images per class from a directory structure.
@@ -203,6 +204,9 @@ def sample_images(
         target_dir (str): Path to the target dataset directory to store sampled data.
         samples_per_class (int): Number of images to sample per class.
         seed (int): Random seed for reproducibility. Default is 42.
+        class_directories: Optional expected class directory names.
+        source_paths_by_class: Optional per-class source-directory overrides.
+        skip_class_directories: Optional classes intentionally absent from this subset.
     """
     source_path = Path(source_dir)
     target_path = Path(target_dir)
@@ -217,10 +221,21 @@ def sample_images(
     expected_class_directories = class_directories or tuple(
         path.name for path in sorted(source_path.iterdir()) if path.is_dir()
     )
+    skipped_class_directories = skip_class_directories or set()
+    unknown_skipped_classes = skipped_class_directories - set(expected_class_directories)
+    if unknown_skipped_classes:
+        raise ValueError(
+            f"Cannot skip unknown class directories: {sorted(unknown_skipped_classes)}"
+        )
+    sampled_class_directories = tuple(
+        class_name
+        for class_name in expected_class_directories
+        if class_name not in skipped_class_directories
+    )
     source_paths_by_class = source_paths_by_class or {}
     class_source_paths = {
         class_name: source_paths_by_class.get(class_name, source_path / class_name)
-        for class_name in expected_class_directories
+        for class_name in sampled_class_directories
     }
     missing_classes = [
         class_name
@@ -231,7 +246,7 @@ def sample_images(
         raise ValueError(f"Source directory is missing class directories: {missing_classes}")
 
     rng = random.Random(seed)
-    for class_name in expected_class_directories:
+    for class_name in sampled_class_directories:
         class_dir = class_source_paths[class_name]
         sampled_class_dir = target_path / class_name
         sampled_class_dir.mkdir(parents=True, exist_ok=True)
@@ -309,12 +324,38 @@ def prepare_training_data(config: Any) -> PreparationResult:
         )
         dataset_root = dataset.images_filtered_dir
 
+    policy = dataset.raw_prefix_validation_sampling
+    policy_class_directory = None
+    if policy is not None:
+        required_policy_keys = {"class_name", "source_subset", "target_subset"}
+        missing_policy_keys = required_policy_keys - set(policy)
+        if missing_policy_keys:
+            raise ValueError(
+                "raw_prefix_validation_sampling is missing required keys: "
+                f"{sorted(missing_policy_keys)}"
+            )
+        if policy["source_subset"] not in dataset.subsets:
+            raise ValueError("raw_prefix_validation_sampling.source_subset is not configured.")
+        if policy["target_subset"] not in dataset.samples_per_class:
+            raise ValueError(
+                "raw_prefix_validation_sampling.target_subset must be a sampled subset."
+            )
+        class_index = config.class_names.index(policy["class_name"])
+        policy_class_directory = dataset.class_directories[class_index]
+
     sampled_subset_paths: dict[str, Path] = {}
     samples_per_subset: dict[str, dict[str, int]] = {}
     for subset in ("train", "val", "test"):
         source_path = dataset_root / dataset.subsets[subset]
         target_path = sampled_root / dataset.subsets[subset]
         source_paths_by_class: dict[str, Path] = {}
+        skip_class_directories: set[str] = set()
+        if (
+            policy is not None
+            and policy_class_directory is not None
+            and subset == policy["target_subset"]
+        ):
+            skip_class_directories.add(policy_class_directory)
         if dataset.filter_single_snippets:
             raw_subset_path = dataset.images_input_dir / dataset.subsets[subset]
             for class_directory in dataset.exclude_classes_from_filtering:
@@ -333,26 +374,33 @@ def prepare_training_data(config: Any) -> PreparationResult:
             seed=config.seed,
             class_directories=dataset.class_directories,
             source_paths_by_class=source_paths_by_class,
+            skip_class_directories=skip_class_directories,
         )
         sampled_subset_paths[subset] = target_path
         samples_per_subset[subset] = {
             class_directory: dataset.samples_per_class[subset]
             for class_directory in dataset.class_directories
+            if class_directory not in skip_class_directories
         }
 
-    policy = dataset.raw_prefix_validation_sampling
     if policy is not None:
-        class_index = config.class_names.index(policy["class_name"])
-        class_directory = dataset.class_directories[class_index]
-        target_path = sampled_subset_paths[policy["target_subset"]] / class_directory
-        shutil.rmtree(target_path)
+        if policy_class_directory is None:
+            raise RuntimeError("Raw-prefix validation policy did not resolve a class directory.")
+        target_path = sampled_subset_paths[policy["target_subset"]] / policy_class_directory
+        if target_path.exists():
+            shutil.rmtree(target_path)
         sample_validation_images_excluding_raw_prefixes(
-            dataset.images_input_dir / dataset.subsets[policy["source_subset"]] / class_directory,
-            sampled_subset_paths["train"] / class_directory,
+            dataset.images_input_dir
+            / dataset.subsets[policy["source_subset"]]
+            / policy_class_directory,
+            sampled_subset_paths["train"] / policy_class_directory,
             target_path,
             dataset.samples_per_class[policy["target_subset"]],
             seed=config.seed,
             delimiter=str(policy.get("delimiter", "-")),
+        )
+        samples_per_subset[policy["target_subset"]][policy_class_directory] = (
+            dataset.samples_per_class[policy["target_subset"]]
         )
 
     return PreparationResult(
