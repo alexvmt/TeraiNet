@@ -1,38 +1,45 @@
-# Repository Overview
+# TeraiNet Project Guidelines
 
-TeraiNet is a wildlife species classification project focused on
-camera trap imagery from the Terai region of Nepal.
+TeraiNet is a lightweight experimental project for wildlife species classification from
+camera-trap imagery. Keep changes easy to understand and review.
 
-Primary use cases:
+## Architecture
 
-- species classification
-- camera trap workflows
-- conservation machine learning
-- TensorFlow/Keras experimentation
+- Put reusable Python logic in `src/terainet/`; keep notebooks as experiment and
+  orchestration layers.
+- Treat `config.yaml` as the source of dataset paths, class definitions, and run settings.
+- Preserve label ordering and preprocessing contracts across data preparation, training,
+  evaluation, and inference.
 
-Canonical workflow:
+## Change Scope
 
-camera trap images
-→ preprocessing
-→ augmentation
-→ TensorFlow training
-→ evaluation
-→ inference
+- Make the smallest change that correctly fulfills the request and preserves existing behavior.
+- Reuse existing patterns before adding abstractions or dependencies.
+- If a broader refactor would materially improve correctness, testability, or maintainability,
+  explain its evidence and propose it as separate follow-up work; do not silently expand scope.
+- Do not modify unrelated files.
 
-# Repository Invariants
+## ML Safety
 
-- Preserve preprocessing consistency between training and inference.
-- Prevent data leakage.
-- Preserve label mapping consistency.
-- Keep experiments reproducible.
-- Reusable logic belongs in `src/`, not notebooks.
+- Keep training, validation, test, and out-of-distribution evaluation data distinct.
+- Prevent leakage, including location-level spatial leakage when location metadata is available.
+- Keep validation and inference deterministic; apply augmentation only to training data.
+- Make inputs, random seeds, label mappings, and generated artifacts explicit and reproducible.
 
-# Repository Structure
+## Validation
 
-- `src/` → reusable code
-- `notebooks/` → experimentation
-- `configs/` → configuration
-- `tests/` → validation
-- `results/` → generated artifacts
+Use the repository tooling after relevant changes:
 
-See `.github/skills/` for domain-specific workflows.
+1. `uv run ruff check .`
+2. `uv run ruff format --check .`
+3. `uv run ty check src/terainet`
+4. `uv run pytest -q`
+
+Run only the applicable checks when a full suite is impractical, and report checks that could
+not be run and why.
+
+## Task-Specific Guidance
+
+Load the relevant workflow skill for camera-trap data, TensorFlow/Keras training, notebook
+extraction, or model release and inference work. Keep detailed procedures in those skills
+rather than duplicating them here.

@@ -12,7 +12,7 @@ repos:
         name: ty check
         entry: uv run ty check
         language: system
-        files: ^utilities/.*\.py$
+        files: ^src/.*\.py$
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
