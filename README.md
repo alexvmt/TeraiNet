@@ -79,6 +79,22 @@ For step 4, just open the notebook in Kaggle directly by clicking the respective
 
 ## Model training and evaluation
 
+Training settings live in [training.yaml](training.yaml). Unlike the shared [config.yaml](config.yaml),
+this file is self-contained: it defines the ordered semantic class mapping, the corresponding image
+directory names, dataset and artifact paths, sampling/filtering policy, model hyperparameters, and
+optional W&B logging. Keep the numeric class indices stable: they are the label contract used for
+training, evaluation, saved class lists, and inference.
+
+The training notebook is an orchestrator. It loads and validates the training configuration,
+prepares deterministic samples, trains the model, saves the run contract, and evaluates the
+held-out test set. It keeps only Kaggle-specific W&B authentication and interactive displays.
+Authenticate W&B in the notebook through the Kaggle secret named `wandb` when logging is enabled.
+
+`test` is the held-out in-distribution evaluation set used for the main report. The optional `ood`
+directory is evaluated and logged separately; it must not be combined with the test result. When
+location metadata exists upstream, create the train/validation/test split by location before this
+workflow using the repository's data utilities.
+
 To train and evaluate a model, open the notebook in Kaggle directly by clicking the respective button below.
 
 [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/code/alexvmt/train-and-evaluate-terainet)

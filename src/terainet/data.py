@@ -6,6 +6,7 @@ import logging
 import random
 import shutil
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,16 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PreparationResult:
+    """Paths and retention statistics produced by training-data preparation."""
+
+    dataset_root: Path
+    sampled_subset_paths: dict[str, Path]
+    filter_stats: dict[str, dict[str, Any]] | None
+    samples_per_subset: dict[str, dict[str, int]]
 
 
 def sample_n_images_per_species(
@@ -172,7 +183,13 @@ def check_location_split(df: pl.DataFrame) -> None:
         logger.warning(f"{violations}")
 
 
-def sample_images(source_dir: str, target_dir: str, samples_per_class: int, seed: int = 42) -> None:
+def sample_images(
+    source_dir: str | Path,
+    target_dir: str | Path,
+    samples_per_class: int,
+    seed: int = 42,
+    class_directories: tuple[str, ...] | None = None,
+) -> None:
     """
     Sample a fixed number of images per class from a directory structure.
 
@@ -186,24 +203,145 @@ def sample_images(source_dir: str, target_dir: str, samples_per_class: int, seed
         samples_per_class (int): Number of images to sample per class.
         seed (int): Random seed for reproducibility. Default is 42.
     """
-    random.seed(seed)
-
     source_path = Path(source_dir)
     target_path = Path(target_dir)
+    if not source_path.is_dir():
+        raise ValueError(f"Source directory not found: {source_path}")
+    if samples_per_class < 0:
+        raise ValueError("samples_per_class must be non-negative.")
+    if target_path.exists() and any(target_path.iterdir()):
+        raise FileExistsError(f"Target directory already exists and is not empty: {target_path}")
     target_path.mkdir(parents=True, exist_ok=True)
 
-    for class_dir in source_path.iterdir():
-        if class_dir.is_dir():
-            sampled_class_dir = target_path / class_dir.name
-            sampled_class_dir.mkdir(parents=True, exist_ok=True)
+    expected_class_directories = class_directories or tuple(
+        path.name for path in sorted(source_path.iterdir()) if path.is_dir()
+    )
+    missing_classes = [
+        class_name
+        for class_name in expected_class_directories
+        if not (source_path / class_name).is_dir()
+    ]
+    if missing_classes:
+        raise ValueError(f"Source directory is missing class directories: {missing_classes}")
 
-            all_images = list(class_dir.iterdir())
-            random.shuffle(all_images)
-            sampled_images = all_images[:samples_per_class]
+    rng = random.Random(seed)
+    for class_name in expected_class_directories:
+        class_dir = source_path / class_name
+        sampled_class_dir = target_path / class_name
+        sampled_class_dir.mkdir(parents=True, exist_ok=True)
 
-            for image_path in sampled_images:
-                target_image_path = sampled_class_dir / image_path.name
-                shutil.copy(image_path, target_image_path)
+        all_images = sorted(path for path in class_dir.iterdir() if path.is_file())
+        if len(all_images) < samples_per_class:
+            raise ValueError(
+                f"Class '{class_name}' has {len(all_images)} images, "
+                f"but {samples_per_class} were requested."
+            )
+        sampled_images = rng.sample(all_images, samples_per_class)
+
+        for image_path in sampled_images:
+            target_image_path = sampled_class_dir / image_path.name
+            shutil.copy2(image_path, target_image_path)
+
+
+def sample_validation_images_excluding_raw_prefixes(
+    source_dir: str | Path,
+    training_dir: str | Path,
+    target_dir: str | Path,
+    samples_per_class: int,
+    seed: int,
+    delimiter: str = "-",
+) -> None:
+    """Sample validation images whose raw-image prefixes are absent from training."""
+    source_path = Path(source_dir)
+    training_path = Path(training_dir)
+    target_path = Path(target_dir)
+    if not source_path.is_dir() or not training_path.is_dir():
+        raise ValueError("Source and training directories must exist for raw-prefix sampling.")
+    if target_path.exists() and any(target_path.iterdir()):
+        raise FileExistsError(f"Target directory already exists and is not empty: {target_path}")
+
+    def raw_prefix(path: Path) -> str:
+        return path.stem.split(delimiter, maxsplit=1)[0]
+
+    training_prefixes = {raw_prefix(path) for path in training_path.iterdir() if path.is_file()}
+    eligible_paths = [
+        path
+        for path in sorted(source_path.iterdir())
+        if path.is_file() and raw_prefix(path) not in training_prefixes
+    ]
+    if len(eligible_paths) < samples_per_class:
+        raise ValueError(
+            f"Only {len(eligible_paths)} raw-prefix-disjoint validation images are available, "
+            f"but {samples_per_class} were requested."
+        )
+
+    target_path.mkdir(parents=True, exist_ok=True)
+    for image_path in random.Random(seed).sample(eligible_paths, samples_per_class):
+        shutil.copy2(image_path, target_path / image_path.name)
+
+    sampled_prefixes = {raw_prefix(path) for path in target_path.iterdir() if path.is_file()}
+    if training_prefixes & sampled_prefixes:
+        raise RuntimeError("Raw-image prefixes overlap between training and validation samples.")
+
+
+def prepare_training_data(config: Any) -> PreparationResult:
+    """Filter and sample configured data without changing held-out OOD data."""
+    dataset = config.dataset
+    sampled_root = dataset.images_sampled_dir
+    if sampled_root.exists() and any(sampled_root.iterdir()):
+        raise FileExistsError(
+            f"Sampled dataset directory already exists and is not empty: {sampled_root}"
+        )
+
+    filter_stats = None
+    dataset_root = dataset.images_input_dir
+    if dataset.filter_single_snippets:
+        filter_stats = filter_single_snippet_images(
+            str(dataset.images_input_dir),
+            str(dataset.images_filtered_dir),
+            exclude_classes=list(dataset.exclude_classes_from_filtering),
+        )
+        dataset_root = dataset.images_filtered_dir
+
+    sampled_subset_paths: dict[str, Path] = {}
+    samples_per_subset: dict[str, dict[str, int]] = {}
+    for subset in ("train", "val", "test"):
+        source_path = dataset_root / dataset.subsets[subset]
+        target_path = sampled_root / dataset.subsets[subset]
+        sample_images(
+            source_path,
+            target_path,
+            dataset.samples_per_class[subset],
+            seed=config.seed,
+            class_directories=dataset.class_directories,
+        )
+        sampled_subset_paths[subset] = target_path
+        samples_per_subset[subset] = {
+            class_directory: dataset.samples_per_class[subset]
+            for class_directory in dataset.class_directories
+        }
+
+    policy = dataset.raw_prefix_validation_sampling
+    if policy is not None:
+        class_index = config.class_names.index(policy["class_name"])
+        class_directory = dataset.class_directories[class_index]
+        target_path = sampled_subset_paths[policy["target_subset"]] / class_directory
+        shutil.rmtree(target_path)
+        sample_validation_images_excluding_raw_prefixes(
+            dataset.images_input_dir / dataset.subsets[policy["source_subset"]] / class_directory,
+            sampled_subset_paths["train"] / class_directory,
+            target_path,
+            dataset.samples_per_class[policy["target_subset"]],
+            seed=config.seed,
+            delimiter=str(policy.get("delimiter", "-")),
+        )
+
+    return PreparationResult(
+        dataset_root=dataset_root,
+        sampled_subset_paths=sampled_subset_paths,
+        filter_stats=filter_stats,
+        samples_per_subset=samples_per_subset,
+    )
 
 
 def filter_single_snippet_images(

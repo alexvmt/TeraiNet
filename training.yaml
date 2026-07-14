@@ -1,0 +1,82 @@
+classes:
+  num_classes: 10
+  tiger: 1
+  leopard: 2
+  black_bear: 3
+  other_carnivores: 4
+  deer: 5
+  wild_boar: 6
+  buffalo: 7
+  rhino: 8
+  elephant: 9
+  bird: 10
+
+dataset:
+  images_input_dir: "/kaggle/input/preprocess-images/terainet_images"
+  images_filtered_dir: "/kaggle/working/images_filtered"
+  images_sampled_dir: "/kaggle/working/images_sampled"
+  class_directories:
+    tiger: "class_1"
+    leopard: "class_2"
+    black_bear: "class_3"
+    other_carnivores: "class_4"
+    deer: "class_5"
+    wild_boar: "class_6"
+    buffalo: "class_7"
+    rhino: "class_8"
+    elephant: "class_9"
+    bird: "class_10"
+  subsets:
+    train: "train"
+    val: "val"
+    test: "test"
+    ood: "test2"
+  samples_per_class:
+    train: 200
+    val: 25
+    test: 25
+  filter_single_snippets: true
+  exclude_classes_from_filtering:
+    - "class_1"
+  raw_prefix_validation_sampling:
+    class_name: "tiger"
+    source_subset: "train"
+    target_subset: "val"
+    delimiter: "-"
+
+training:
+  seed: 42
+  image_size: 224
+  batch_size: 8
+  apply_augmentations: true
+  backbone: "EfficientNetV2S"
+  dropout_rate: 0.2
+  epochs: 2
+  learning_rate: 0.0001
+  amsgrad: true
+  weight_decay: 0.0001
+  label_smoothing: 0.1
+  early_stopping:
+    monitor: "val_loss"
+    mode: "min"
+    min_delta: 0.0001
+    patience: 8
+    restore_best_weights: true
+  reduce_lr_on_plateau:
+    monitor: "val_loss"
+    mode: "min"
+    factor: 0.5
+    patience: 3
+    min_lr: 0.000001
+
+artifacts:
+  model: "/kaggle/working/model.keras"
+  class_list: "/kaggle/working/class_list.yaml"
+  effective_config: "/kaggle/working/training_config.yaml"
+  preparation_summary: "/kaggle/working/preparation_summary.yaml"
+  classification_report: "/kaggle/working/classification_report.csv"
+  confusion_matrix: "/kaggle/working/confusion_matrix.png"
+
+wandb:
+  enabled: false
+  project: "TeraiNet"

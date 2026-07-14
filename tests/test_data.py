@@ -11,6 +11,7 @@ from terainet.data import (
     filter_single_snippet_images,
     sample_images,
     sample_n_images_per_species,
+    sample_validation_images_excluding_raw_prefixes,
 )
 
 
@@ -141,6 +142,39 @@ class TestSampleImages:
         assert os.path.exists(os.path.join(target_dir, "class2"))
         assert len(os.listdir(os.path.join(target_dir, "class1"))) == 2
         assert len(os.listdir(os.path.join(target_dir, "class2"))) == 2
+
+    def test_sample_images_rejects_insufficient_images(self, temp_dir):
+        """Sampling never silently returns fewer than the requested class count."""
+        source_dir = os.path.join(temp_dir, "source")
+        class_dir = os.path.join(source_dir, "class1")
+        os.makedirs(class_dir)
+        open(os.path.join(class_dir, "image.jpg"), "a").close()
+
+        with pytest.raises(ValueError, match="but 2 were requested"):
+            sample_images(source_dir, os.path.join(temp_dir, "target"), samples_per_class=2)
+
+
+def test_sample_validation_images_excluding_raw_prefixes(temp_dir):
+    """Validation sampling excludes every raw image represented in training."""
+    source_dir = os.path.join(temp_dir, "source")
+    training_dir = os.path.join(temp_dir, "training")
+    target_dir = os.path.join(temp_dir, "validation")
+    os.makedirs(source_dir)
+    os.makedirs(training_dir)
+
+    for filename in ["raw1-0.jpg", "raw2-0.jpg", "raw3-0.jpg"]:
+        open(os.path.join(source_dir, filename), "a").close()
+    open(os.path.join(training_dir, "raw1-1.jpg"), "a").close()
+
+    sample_validation_images_excluding_raw_prefixes(
+        source_dir,
+        training_dir,
+        target_dir,
+        samples_per_class=2,
+        seed=42,
+    )
+
+    assert {path.split("-")[0] for path in os.listdir(target_dir)} == {"raw2", "raw3"}
 
 
 class TestFilterSingleSnippetImages:
