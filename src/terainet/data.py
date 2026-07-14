@@ -189,6 +189,7 @@ def sample_images(
     samples_per_class: int,
     seed: int = 42,
     class_directories: tuple[str, ...] | None = None,
+    source_paths_by_class: dict[str, Path] | None = None,
 ) -> None:
     """
     Sample a fixed number of images per class from a directory structure.
@@ -216,17 +217,22 @@ def sample_images(
     expected_class_directories = class_directories or tuple(
         path.name for path in sorted(source_path.iterdir()) if path.is_dir()
     )
+    source_paths_by_class = source_paths_by_class or {}
+    class_source_paths = {
+        class_name: source_paths_by_class.get(class_name, source_path / class_name)
+        for class_name in expected_class_directories
+    }
     missing_classes = [
         class_name
-        for class_name in expected_class_directories
-        if not (source_path / class_name).is_dir()
+        for class_name, class_path in class_source_paths.items()
+        if not class_path.is_dir()
     ]
     if missing_classes:
         raise ValueError(f"Source directory is missing class directories: {missing_classes}")
 
     rng = random.Random(seed)
     for class_name in expected_class_directories:
-        class_dir = source_path / class_name
+        class_dir = class_source_paths[class_name]
         sampled_class_dir = target_path / class_name
         sampled_class_dir.mkdir(parents=True, exist_ok=True)
 
@@ -308,12 +314,25 @@ def prepare_training_data(config: Any) -> PreparationResult:
     for subset in ("train", "val", "test"):
         source_path = dataset_root / dataset.subsets[subset]
         target_path = sampled_root / dataset.subsets[subset]
+        source_paths_by_class: dict[str, Path] = {}
+        if dataset.filter_single_snippets:
+            raw_subset_path = dataset.images_input_dir / dataset.subsets[subset]
+            for class_directory in dataset.exclude_classes_from_filtering:
+                filtered_class_path = source_path / class_directory
+                raw_class_path = raw_subset_path / class_directory
+                if not filtered_class_path.is_dir() and raw_class_path.is_dir():
+                    logger.info(
+                        "Sampling excluded class '%s' from its unfiltered source directory.",
+                        class_directory,
+                    )
+                    source_paths_by_class[class_directory] = raw_class_path
         sample_images(
             source_path,
             target_path,
             dataset.samples_per_class[subset],
             seed=config.seed,
             class_directories=dataset.class_directories,
+            source_paths_by_class=source_paths_by_class,
         )
         sampled_subset_paths[subset] = target_path
         samples_per_subset[subset] = {

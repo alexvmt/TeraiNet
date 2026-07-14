@@ -1,6 +1,7 @@
 """Tests for terainet.data module."""
 
 import os
+from pathlib import Path
 
 import polars as pl
 import pytest
@@ -152,6 +153,26 @@ class TestSampleImages:
 
         with pytest.raises(ValueError, match="but 2 were requested"):
             sample_images(source_dir, os.path.join(temp_dir, "target"), samples_per_class=2)
+
+    def test_sample_images_uses_explicit_class_source_override(self, temp_dir):
+        """An intentionally unfiltered class can use its raw source directory."""
+        filtered_source = os.path.join(temp_dir, "filtered")
+        raw_class_dir = os.path.join(temp_dir, "raw", "class_1")
+        os.makedirs(filtered_source)
+        os.makedirs(raw_class_dir)
+        for index in range(2):
+            open(os.path.join(raw_class_dir, f"image_{index}.jpg"), "a").close()
+
+        target_dir = os.path.join(temp_dir, "sampled")
+        sample_images(
+            filtered_source,
+            target_dir,
+            samples_per_class=2,
+            class_directories=("class_1",),
+            source_paths_by_class={"class_1": Path(raw_class_dir)},
+        )
+
+        assert len(os.listdir(os.path.join(target_dir, "class_1"))) == 2
 
 
 def test_sample_validation_images_excluding_raw_prefixes(temp_dir):
