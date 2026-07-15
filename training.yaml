@@ -32,9 +32,9 @@ dataset:
     test: "test"
     ood: "test2"
   samples_per_class:
-    train: 200
-    val: 25
-    test: 25
+    train: 2000
+    val: 250
+    test: 250
   filter_single_snippets: true
   exclude_classes_from_filtering:
     - "class_1"
@@ -49,9 +49,9 @@ training:
   image_size: 224
   batch_size: 8
   apply_augmentations: true
-  backbone: "EfficientNetV2S"
+  backbone: "EfficientNetV2M"
   dropout_rate: 0.2
-  epochs: 2
+  epochs: 50
   learning_rate: 0.0001
   amsgrad: true
   weight_decay: 0.0001
@@ -78,5 +78,5 @@ artifacts:
   confusion_matrix: "/kaggle/working/confusion_matrix.png"
 
 wandb:
-  enabled: false
+  enabled: true
   project: "TeraiNet"
