@@ -5,7 +5,9 @@ from pathlib import Path
 import yaml
 
 
-def create_class_list_yaml_file(num_classes: int, class_names: list[str], file_path: str) -> None:
+def create_class_list_yaml_file(
+    num_classes: int, class_names: list[str], file_path: str | Path
+) -> None:
     """
     Create a YAML file that maps numerical indices to class names.
 
