@@ -35,13 +35,23 @@ class EvaluationResult:
 
 
 def collect_predictions(model: Any, dataset: Any) -> tuple[np.ndarray, np.ndarray]:
-    """Collect global class indices and predictions from a categorical dataset."""
+    """Collect global class indices and predictions from a categorical or binary dataset.
+
+    A single sigmoid output (binary classification) is detected from the prediction
+    width and thresholded at 0.5; a multi-unit softmax output is read via argmax,
+    matching the one-hot label contract used elsewhere in the pipeline.
+    """
     true_labels: list[np.ndarray] = []
     predicted_labels: list[np.ndarray] = []
     for images, labels in dataset:
-        true_labels.append(np.argmax(labels.numpy(), axis=-1))
-        predictions = model.predict(images, verbose=0)
-        predicted_labels.append(np.argmax(predictions, axis=-1))
+        label_array = np.asarray(labels.numpy())
+        predictions = np.asarray(model.predict(images, verbose=0))
+        if predictions.shape[-1] == 1:
+            true_labels.append(label_array.reshape(-1).astype(int))
+            predicted_labels.append((predictions.reshape(-1) >= 0.5).astype(int))
+        else:
+            true_labels.append(np.argmax(label_array, axis=-1))
+            predicted_labels.append(np.argmax(predictions, axis=-1))
 
     if not true_labels:
         raise ValueError("Cannot evaluate an empty dataset.")
@@ -78,25 +88,42 @@ def _classification_report(
 
 
 def evaluate_dataset(
-    model: Any, dataset: Any, class_names: tuple[str, ...], name: str
+    model: Any,
+    dataset: Any,
+    class_names: tuple[str, ...],
+    name: str,
+    restrict_macro_to_observed_classes: bool = False,
 ) -> EvaluationResult:
-    """Evaluate a dataset and compute stable per-class and aggregate metrics."""
+    """Evaluate a dataset and compute stable per-class and aggregate metrics.
+
+    When `restrict_macro_to_observed_classes` is True, macro-averaged precision, recall,
+    and f1 are computed only over classes that actually appear in `true_labels`. This
+    keeps partial-coverage evaluations (e.g. an out-of-distribution split that only
+    contains a subset of the configured classes) from being diluted by classes with no
+    ground truth, which would otherwise force their recall to zero. The classification
+    report and confusion matrix always retain the full configured class order.
+    """
     true_labels, predicted_labels = collect_predictions(model, dataset)
     labels = list(range(len(class_names)))
+    macro_labels = (
+        sorted(set(true_labels.tolist())) if restrict_macro_to_observed_classes else labels
+    )
     metrics = {
         "accuracy": float(np.mean(true_labels == predicted_labels)),
         "precision_macro": float(
             precision_score(
-                true_labels, predicted_labels, labels=labels, average="macro", zero_division=0
+                true_labels, predicted_labels, labels=macro_labels, average="macro", zero_division=0
             )
         ),
         "recall_macro": float(
             recall_score(
-                true_labels, predicted_labels, labels=labels, average="macro", zero_division=0
+                true_labels, predicted_labels, labels=macro_labels, average="macro", zero_division=0
             )
         ),
         "f1_macro": float(
-            f1_score(true_labels, predicted_labels, labels=labels, average="macro", zero_division=0)
+            f1_score(
+                true_labels, predicted_labels, labels=macro_labels, average="macro", zero_division=0
+            )
         ),
     }
     return EvaluationResult(

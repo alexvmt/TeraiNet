@@ -78,6 +78,11 @@ def _validate_dataset_directory(path: Path, expected_classes: tuple[str, ...]) -
         )
 
 
+def _label_mode(num_classes: int) -> str:
+    """Return the Keras dataset label mode for the configured number of classes."""
+    return "binary" if num_classes == 2 else "categorical"
+
+
 def _create_dataset(
     path: Path,
     class_directories: tuple[str, ...],
@@ -90,7 +95,7 @@ def _create_dataset(
     return keras.utils.image_dataset_from_directory(
         path,
         labels="inferred",
-        label_mode="categorical",
+        label_mode=_label_mode(len(config.class_names)),
         class_names=list(class_directories),
         color_mode="rgb",
         batch_size=None,
@@ -141,20 +146,32 @@ def _remap_ood_labels(
     local_class_directories: tuple[str, ...],
     config: TrainingConfig,
 ) -> Any:
-    """Map an OOD dataset's local one-hot labels to the global class index contract."""
+    """Map an OOD dataset's local labels to the global class index contract.
+
+    Handles both the one-hot categorical label contract and the scalar binary label
+    contract, matching whichever label mode `_create_dataset` used for this run.
+    """
     import tensorflow as tf
 
     global_indices = [
         config.dataset.class_directories.index(name) for name in local_class_directories
     ]
     index_lookup = tf.constant(global_indices, dtype=tf.int32)
+    num_classes = len(config.class_names)
+
+    if num_classes == 2:
+        return dataset.map(
+            lambda images, labels: (
+                images,
+                tf.cast(tf.gather(index_lookup, tf.cast(labels, tf.int32)), tf.float32),
+            ),
+            num_parallel_calls=tf.data.AUTOTUNE,
+        )
 
     return dataset.map(
         lambda images, labels: (
             images,
-            tf.one_hot(
-                tf.gather(index_lookup, tf.argmax(labels, axis=-1)), len(config.class_names)
-            ),
+            tf.one_hot(tf.gather(index_lookup, tf.argmax(labels, axis=-1)), num_classes),
         ),
         num_parallel_calls=tf.data.AUTOTUNE,
     )
@@ -205,6 +222,17 @@ def create_datasets(config: TrainingConfig, preparation: PreparationResult) -> D
     )
 
 
+def _classifier_head_config(num_classes: int) -> tuple[int, str]:
+    """Return the (units, activation) for the final classification layer.
+
+    Binary classification uses a single sigmoid unit; multiclass uses one softmax unit
+    per class.
+    """
+    if num_classes == 2:
+        return 1, "sigmoid"
+    return num_classes, "softmax"
+
+
 def build_model(config: TrainingConfig) -> ModelBuildResult:
     """Build the configured frozen EfficientNetV2 classification model."""
     import keras
@@ -223,13 +251,18 @@ def build_model(config: TrainingConfig) -> ModelBuildResult:
     features = base_model(inputs, training=False)
     features = keras.layers.GlobalAveragePooling2D()(features)
     features = keras.layers.Dropout(config.dropout_rate)(features)
-    outputs = keras.layers.Dense(len(config.class_names), activation="softmax")(features)
+    units, activation = _classifier_head_config(len(config.class_names))
+    outputs = keras.layers.Dense(units, activation=activation)(features)
     model = keras.Model(inputs, outputs, name="terainet_classifier")
     return ModelBuildResult(model, parameter_count, frozen_file_size)
 
 
 def compile_model(model: Any, config: TrainingConfig) -> None:
-    """Compile a multiclass classifier from the configured optimizer and loss settings."""
+    """Compile a classifier from the configured optimizer and loss settings.
+
+    Uses binary cross-entropy for a 2-class configuration and categorical
+    cross-entropy otherwise, matching the classification head built by `build_model`.
+    """
     import keras
 
     optimizer = keras.optimizers.AdamW(
@@ -237,9 +270,13 @@ def compile_model(model: Any, config: TrainingConfig) -> None:
         amsgrad=config.amsgrad,
         weight_decay=config.weight_decay,
     )
+    if len(config.class_names) == 2:
+        loss = keras.losses.BinaryCrossentropy(label_smoothing=config.label_smoothing)
+    else:
+        loss = keras.losses.CategoricalCrossentropy(label_smoothing=config.label_smoothing)
     model.compile(
         optimizer=optimizer,
-        loss=keras.losses.CategoricalCrossentropy(label_smoothing=config.label_smoothing),
+        loss=loss,
         metrics=["accuracy"],
     )
 
