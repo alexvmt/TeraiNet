@@ -229,6 +229,11 @@ def load_training_config(config_path: str | Path) -> TrainingConfig:
         raise ValueError(f"artifacts is missing required paths: {sorted(missing_artifacts)}")
     if len(set(artifact_paths.values())) != len(artifact_paths):
         raise ValueError("Artifact paths must be distinct.")
+    if artifact_paths["model"].suffix != ".keras":
+        raise ValueError(
+            "artifacts.model must use the '.keras' single-file format for downstream "
+            f"compatibility, got: {artifact_paths['model']}"
+        )
 
     return TrainingConfig(
         path=path,
