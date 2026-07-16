@@ -191,7 +191,8 @@ def sample_images(
     class_directories: tuple[str, ...] | None = None,
     source_paths_by_class: dict[str, Path] | None = None,
     skip_class_directories: set[str] | None = None,
-) -> None:
+    cap_to_available: bool = True,
+) -> dict[str, int]:
     """
     Sample a fixed number of images per class from a directory structure.
 
@@ -207,6 +208,13 @@ def sample_images(
         class_directories: Optional expected class directory names.
         source_paths_by_class: Optional per-class source-directory overrides.
         skip_class_directories: Optional classes intentionally absent from this subset.
+        cap_to_available: When True (default), sample every available image for a class
+            that has fewer than `samples_per_class` images instead of raising. Set to
+            False to require exactly `samples_per_class` images per class.
+
+    Returns:
+        dict[str, int]: The actual number of images sampled per class directory, which
+            can be less than `samples_per_class` when `cap_to_available` is True.
     """
     source_path = Path(source_dir)
     target_path = Path(target_dir)
@@ -246,22 +254,36 @@ def sample_images(
         raise ValueError(f"Source directory is missing class directories: {missing_classes}")
 
     rng = random.Random(seed)
+    sampled_counts: dict[str, int] = {}
     for class_name in sampled_class_directories:
         class_dir = class_source_paths[class_name]
         sampled_class_dir = target_path / class_name
         sampled_class_dir.mkdir(parents=True, exist_ok=True)
 
         all_images = sorted(path for path in class_dir.iterdir() if path.is_file())
+        effective_samples_per_class = samples_per_class
         if len(all_images) < samples_per_class:
-            raise ValueError(
-                f"Class '{class_name}' has {len(all_images)} images, "
-                f"but {samples_per_class} were requested."
+            if not cap_to_available:
+                raise ValueError(
+                    f"Class '{class_name}' has {len(all_images)} images, "
+                    f"but {samples_per_class} were requested."
+                )
+            logger.warning(
+                "Class '%s' has only %d images, fewer than the %d requested; "
+                "sampling all available images instead.",
+                class_name,
+                len(all_images),
+                samples_per_class,
             )
-        sampled_images = rng.sample(all_images, samples_per_class)
+            effective_samples_per_class = len(all_images)
+        sampled_images = rng.sample(all_images, effective_samples_per_class)
+        sampled_counts[class_name] = effective_samples_per_class
 
         for image_path in sampled_images:
             target_image_path = sampled_class_dir / image_path.name
             shutil.copy2(image_path, target_image_path)
+
+    return sampled_counts
 
 
 def sample_validation_images_excluding_raw_prefixes(
@@ -271,8 +293,19 @@ def sample_validation_images_excluding_raw_prefixes(
     samples_per_class: int,
     seed: int,
     delimiter: str = "-",
-) -> None:
-    """Sample validation images whose raw-image prefixes are absent from training."""
+    cap_to_available: bool = True,
+) -> int:
+    """Sample validation images whose raw-image prefixes are absent from training.
+
+    Parameters:
+        cap_to_available: When True (default), sample every eligible image if fewer
+            than `samples_per_class` are available instead of raising. Set to False to
+            require exactly `samples_per_class` eligible images.
+
+    Returns:
+        int: The actual number of images sampled, which can be less than
+            `samples_per_class` when `cap_to_available` is True.
+    """
     source_path = Path(source_dir)
     training_path = Path(training_dir)
     target_path = Path(target_dir)
@@ -290,19 +323,30 @@ def sample_validation_images_excluding_raw_prefixes(
         for path in sorted(source_path.iterdir())
         if path.is_file() and raw_prefix(path) not in training_prefixes
     ]
+    effective_samples_per_class = samples_per_class
     if len(eligible_paths) < samples_per_class:
-        raise ValueError(
-            f"Only {len(eligible_paths)} raw-prefix-disjoint validation images are available, "
-            f"but {samples_per_class} were requested."
+        if not cap_to_available:
+            raise ValueError(
+                f"Only {len(eligible_paths)} raw-prefix-disjoint validation images are "
+                f"available, but {samples_per_class} were requested."
+            )
+        logger.warning(
+            "Only %d raw-prefix-disjoint validation images are available, fewer than the "
+            "%d requested; sampling all available images instead.",
+            len(eligible_paths),
+            samples_per_class,
         )
+        effective_samples_per_class = len(eligible_paths)
 
     target_path.mkdir(parents=True, exist_ok=True)
-    for image_path in random.Random(seed).sample(eligible_paths, samples_per_class):
+    for image_path in random.Random(seed).sample(eligible_paths, effective_samples_per_class):
         shutil.copy2(image_path, target_path / image_path.name)
 
     sampled_prefixes = {raw_prefix(path) for path in target_path.iterdir() if path.is_file()}
     if training_prefixes & sampled_prefixes:
         raise RuntimeError("Raw-image prefixes overlap between training and validation samples.")
+
+    return effective_samples_per_class
 
 
 def prepare_training_data(config: Any) -> PreparationResult:
@@ -367,7 +411,7 @@ def prepare_training_data(config: Any) -> PreparationResult:
                         class_directory,
                     )
                     source_paths_by_class[class_directory] = raw_class_path
-        sample_images(
+        sampled_counts = sample_images(
             source_path,
             target_path,
             dataset.samples_per_class[subset],
@@ -375,13 +419,10 @@ def prepare_training_data(config: Any) -> PreparationResult:
             class_directories=dataset.class_directories,
             source_paths_by_class=source_paths_by_class,
             skip_class_directories=skip_class_directories,
+            cap_to_available=dataset.cap_samples_to_available,
         )
         sampled_subset_paths[subset] = target_path
-        samples_per_subset[subset] = {
-            class_directory: dataset.samples_per_class[subset]
-            for class_directory in dataset.class_directories
-            if class_directory not in skip_class_directories
-        }
+        samples_per_subset[subset] = sampled_counts
 
     if policy is not None:
         if policy_class_directory is None:
@@ -389,7 +430,7 @@ def prepare_training_data(config: Any) -> PreparationResult:
         target_path = sampled_subset_paths[policy["target_subset"]] / policy_class_directory
         if target_path.exists():
             shutil.rmtree(target_path)
-        sample_validation_images_excluding_raw_prefixes(
+        actual_count = sample_validation_images_excluding_raw_prefixes(
             dataset.images_input_dir
             / dataset.subsets[policy["source_subset"]]
             / policy_class_directory,
@@ -398,10 +439,9 @@ def prepare_training_data(config: Any) -> PreparationResult:
             dataset.samples_per_class[policy["target_subset"]],
             seed=config.seed,
             delimiter=str(policy.get("delimiter", "-")),
+            cap_to_available=dataset.cap_samples_to_available,
         )
-        samples_per_subset[policy["target_subset"]][policy_class_directory] = (
-            dataset.samples_per_class[policy["target_subset"]]
-        )
+        samples_per_subset[policy["target_subset"]][policy_class_directory] = actual_count
 
     return PreparationResult(
         dataset_root=dataset_root,

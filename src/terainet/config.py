@@ -37,6 +37,7 @@ class DatasetPreparationConfig:
     filter_single_snippets: bool
     exclude_classes_from_filtering: tuple[str, ...]
     raw_prefix_validation_sampling: dict[str, Any] | None
+    cap_samples_to_available: bool
 
 
 @dataclass(frozen=True)
@@ -186,6 +187,7 @@ def load_training_config(config_path: str | Path) -> TrainingConfig:
         filter_single_snippets=bool(dataset_config.get("filter_single_snippets", False)),
         exclude_classes_from_filtering=tuple(excluded_class_directories),
         raw_prefix_validation_sampling=raw_prefix_policy,
+        cap_samples_to_available=bool(dataset_config.get("cap_samples_to_available", True)),
     )
 
     image_size = training_config["image_size"]

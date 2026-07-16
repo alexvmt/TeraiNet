@@ -113,3 +113,26 @@ def test_load_training_config_rejects_unknown_filter_exclusion(tmp_path):
 
     with pytest.raises(ValueError, match="unknown class directories"):
         load_training_config(config_path)
+
+
+def test_load_training_config_defaults_cap_samples_to_available_to_true(tmp_path):
+    """Sampling caps to the available image count by default when not configured."""
+    config_path = tmp_path / "training.yaml"
+    _write_training_config(config_path)
+
+    config = load_training_config(config_path)
+
+    assert config.dataset.cap_samples_to_available is True
+
+
+def test_load_training_config_respects_cap_samples_to_available_override(tmp_path):
+    """cap_samples_to_available can be disabled to require exact per-class counts."""
+    config_path = tmp_path / "training.yaml"
+    _write_training_config(config_path)
+    config = yaml.safe_load(config_path.read_text())
+    config["dataset"]["cap_samples_to_available"] = False
+    config_path.write_text(yaml.safe_dump(config))
+
+    config = load_training_config(config_path)
+
+    assert config.dataset.cap_samples_to_available is False
