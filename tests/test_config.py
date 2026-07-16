@@ -115,6 +115,18 @@ def test_load_training_config_rejects_unknown_filter_exclusion(tmp_path):
         load_training_config(config_path)
 
 
+def test_load_training_config_rejects_non_keras_model_artifact(tmp_path):
+    """The model artifact must stay a single-file .keras save for downstream tools."""
+    config_path = tmp_path / "training.yaml"
+    _write_training_config(config_path)
+    config = yaml.safe_load(config_path.read_text())
+    config["artifacts"]["model"] = "artifacts/model.h5"
+    config_path.write_text(yaml.safe_dump(config))
+
+    with pytest.raises(ValueError, match="'.keras'"):
+        load_training_config(config_path)
+
+
 def test_load_training_config_defaults_cap_samples_to_available_to_true(tmp_path):
     """Sampling caps to the available image count by default when not configured."""
     config_path = tmp_path / "training.yaml"
