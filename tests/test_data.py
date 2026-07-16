@@ -146,15 +146,33 @@ class TestSampleImages:
         assert len(os.listdir(os.path.join(target_dir, "class1"))) == 2
         assert len(os.listdir(os.path.join(target_dir, "class2"))) == 2
 
-    def test_sample_images_rejects_insufficient_images(self, temp_dir):
-        """Sampling never silently returns fewer than the requested class count."""
+    def test_sample_images_rejects_insufficient_images_when_capping_disabled(self, temp_dir):
+        """With capping disabled, sampling never silently returns fewer than requested."""
         source_dir = os.path.join(temp_dir, "source")
         class_dir = os.path.join(source_dir, "class1")
         os.makedirs(class_dir)
         open(os.path.join(class_dir, "image.jpg"), "a").close()
 
         with pytest.raises(ValueError, match="but 2 were requested"):
-            sample_images(source_dir, os.path.join(temp_dir, "target"), samples_per_class=2)
+            sample_images(
+                source_dir,
+                os.path.join(temp_dir, "target"),
+                samples_per_class=2,
+                cap_to_available=False,
+            )
+
+    def test_sample_images_caps_to_available_by_default(self, temp_dir):
+        """By default, a class short on images is sampled fully instead of raising."""
+        source_dir = os.path.join(temp_dir, "source")
+        class_dir = os.path.join(source_dir, "class1")
+        os.makedirs(class_dir)
+        open(os.path.join(class_dir, "image.jpg"), "a").close()
+
+        target_dir = os.path.join(temp_dir, "target")
+        sampled_counts = sample_images(source_dir, target_dir, samples_per_class=2)
+
+        assert sampled_counts == {"class1": 1}
+        assert len(os.listdir(os.path.join(target_dir, "class1"))) == 1
 
     def test_sample_images_uses_explicit_class_source_override(self, temp_dir):
         """An intentionally unfiltered class can use its raw source directory."""
@@ -223,7 +241,7 @@ def test_sample_validation_images_excluding_raw_prefixes(temp_dir):
         open(os.path.join(source_dir, filename), "a").close()
     open(os.path.join(training_dir, "raw1-1.jpg"), "a").close()
 
-    sample_validation_images_excluding_raw_prefixes(
+    actual_count = sample_validation_images_excluding_raw_prefixes(
         source_dir,
         training_dir,
         target_dir,
@@ -231,7 +249,51 @@ def test_sample_validation_images_excluding_raw_prefixes(temp_dir):
         seed=42,
     )
 
+    assert actual_count == 2
     assert {path.split("-")[0] for path in os.listdir(target_dir)} == {"raw2", "raw3"}
+
+
+def test_sample_validation_images_excluding_raw_prefixes_caps_to_available_by_default(temp_dir):
+    """Fewer eligible images than requested are sampled fully instead of raising."""
+    source_dir = os.path.join(temp_dir, "source")
+    training_dir = os.path.join(temp_dir, "training")
+    target_dir = os.path.join(temp_dir, "validation")
+    os.makedirs(source_dir)
+    os.makedirs(training_dir)
+
+    open(os.path.join(source_dir, "raw2-0.jpg"), "a").close()
+    open(os.path.join(training_dir, "raw1-1.jpg"), "a").close()
+
+    actual_count = sample_validation_images_excluding_raw_prefixes(
+        source_dir,
+        training_dir,
+        target_dir,
+        samples_per_class=2,
+        seed=42,
+    )
+
+    assert actual_count == 1
+    assert os.listdir(target_dir) == ["raw2-0.jpg"]
+
+
+def test_sample_validation_images_excluding_raw_prefixes_rejects_when_capping_disabled(temp_dir):
+    """With capping disabled, insufficient eligible images raise instead of under-sampling."""
+    source_dir = os.path.join(temp_dir, "source")
+    training_dir = os.path.join(temp_dir, "training")
+    os.makedirs(source_dir)
+    os.makedirs(training_dir)
+
+    open(os.path.join(source_dir, "raw2-0.jpg"), "a").close()
+
+    with pytest.raises(ValueError, match="but 2 were requested"):
+        sample_validation_images_excluding_raw_prefixes(
+            source_dir,
+            training_dir,
+            os.path.join(temp_dir, "validation"),
+            samples_per_class=2,
+            seed=42,
+            cap_to_available=False,
+        )
 
 
 def test_prepare_training_data_creates_missing_policy_target_class(temp_dir):
@@ -268,6 +330,7 @@ def test_prepare_training_data_creates_missing_policy_target_class(temp_dir):
                 "source_subset": "train",
                 "target_subset": "val",
             },
+            cap_samples_to_available=True,
         ),
     )
 
