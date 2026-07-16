@@ -104,7 +104,7 @@ To train and evaluate a model, open the notebook in Kaggle directly by clicking 
 3. Log experiments using [Weights & Biases](https://wandb.ai/alexvmt/TeraiNet/overview)
 
 I selected a pre-trained EfficientNetV2M with 54M parameters because it constitutes a good compromise between predictive performance, training time and model size.
-The model has been trained for 35 epochs (with early stopping) with about 2,000 images per class (250 images per class in the validation set). The model has been evaluated on a separate test set with 250 images per class.
+The model has been trained for 46 epochs (with early stopping) with about 2,000 images per class (250 images per class in the validation set). The model has been evaluated on a separate test set with 250 images per class.
 
 *Note: There are only ~300 tiger images on LILA BC. I didn't use them in training and validation but instead put all of them in `test2` to examine how the model would potentially generalize to tiger camera trap images from another source than the tiger training images (like it would be the case with the Nepal Tiger Trust using the model on their own images through AddaxAI, for example).*
 
@@ -121,21 +121,21 @@ The model has been trained for 35 epochs (with early stopping) with about 2,000 
 
 | Class            | Precision | Recall | F1-Score | Support |
 |------------------|-----------|--------|----------|---------|
-| tiger            | 1.000     | 0.992  | 0.996    | 250     |
-| leopard          | 0.955     | 0.932  | 0.943    | 250     |
-| black_bear       | 0.956     | 0.956  | 0.956    | 250     |
-| other_carnivores | 0.894     | 0.940  | 0.916    | 250     |
-| deer             | 0.935     | 0.864  | 0.898    | 250     |
-| wild_boar        | 0.987     | 0.900  | 0.941    | 250     |
-| buffalo          | 0.910     | 0.968  | 0.938    | 250     |
-| rhino            | 0.894     | 0.912  | 0.903    | 250     |
-| elephant         | 0.908     | 0.952  | 0.930    | 250     |
-| bird             | 0.925     | 0.936  | 0.930    | 250     |
+| tiger            | 0.996     | 0.996  | 0.996    | 250     |
+| leopard          | 0.947     | 0.936  | 0.942    | 250     |
+| black_bear       | 0.914     | 0.940  | 0.927    | 250     |
+| other_carnivores | 0.941     | 0.892  | 0.916    | 250     |
+| deer             | 0.978     | 0.908  | 0.942    | 250     |
+| wild_boar        | 0.930     | 0.956  | 0.943    | 250     |
+| buffalo          | 0.885     | 0.928  | 0.906    | 250     |
+| rhino            | 0.901     | 0.948  | 0.924    | 250     |
+| elephant         | 0.923     | 0.916  | 0.920    | 250     |
+| bird             | 0.939     | 0.928  | 0.934    | 250     |
 | **micro avg**    | 0.935     | 0.935  | 0.935    | 2500    |
 | **macro avg**    | 0.936     | 0.935  | 0.935    | 2500    |
 | **weighted avg** | 0.936     | 0.935  | 0.935    | 2500    |
 
-*Note: Test set performance for the tiger class is extremely high because the respective images are unrealistically good. The performance on the tiger images in `test2` is more realistic (`test2` accuracy: 0.895).*
+*Note: Test set performance for the tiger class is extremely high because the respective images are unrealistically good. The performance on the tiger images in `test2` is more realistic (`test2` accuracy: 0.885).*
 
 ### Test set confusion matrix
 
